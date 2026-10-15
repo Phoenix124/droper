@@ -1,4 +1,4 @@
-import { extname, isAbsolute, join } from 'node:path';
+import { extname, posix } from 'node:path';
 
 // What macOS screencapture, Windows Snipping Tool and screen recorders save.
 const SCREENSHOT_EXTS = new Set(['.png', '.jpg', '.jpeg', '.heic', '.tif', '.tiff', '.gif', '.pdf', '.mov', '.mp4']);
@@ -8,6 +8,8 @@ const SCREENSHOT_EXTS = new Set(['.png', '.jpg', '.jpeg', '.heic', '.tif', '.tif
  * macOS falls back to the Desktop for a missing or unusable location, and so do we.
  */
 export function macScreenshotDir(location: string | null, home: string): string {
+  // macOS paths whatever platform runs this (tests run on Windows CI too).
+  const { isAbsolute, join } = posix;
   const raw = location?.trim() ?? '';
   const dir = raw === '~' ? home : raw.startsWith('~/') ? join(home, raw.slice(2)) : raw;
   return dir && isAbsolute(dir) ? dir : join(home, 'Desktop');
