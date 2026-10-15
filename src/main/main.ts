@@ -32,6 +32,7 @@ import { isIgnoredApp, type AppIdentity } from '../core/ignoredApps.js';
 import { JsonFile } from '../core/jsonFile.js';
 import { latestOnly } from '../core/latest.js';
 import { SettingsStore, type Settings } from '../core/settings.js';
+import { cleanPositions, type ShelfPositions } from '../core/shelfPlacement.js';
 import { ShelfStore, type ShelfItem, type ShelfState } from '../core/shelfStore.js';
 import { isDisplaySafePath, needsConfirmation, parseDroperUrl, type UrlAction } from '../core/urlScheme.js';
 import type { ClipEntryView, ItemView } from '../shared/api';
@@ -160,7 +161,13 @@ class Controller {
   private readonly settings = new SettingsStore(new JsonFile<Settings>(join(this.dataDir, 'settings.json')));
   private readonly store: ShelfStore;
   private readonly history: ClipboardHistory;
-  private readonly shelf = new ShelfWindow();
+  private readonly positionsFile = new JsonFile<ShelfPositions>(join(this.dataDir, 'shelfPositions.json'));
+  private positions = cleanPositions(this.positionsFile.read());
+  private positionsSave: NodeJS.Timeout | null = null;
+  private readonly shelf = new ShelfWindow({
+    remembered: (displayId) => this.positions[displayId] ?? null,
+    moved: (displayId, rel) => this.setPositions({ ...this.positions, [displayId]: rel }),
+  });
   private readonly preview = new PreviewWindow((open) => this.shelf.send('shelf:previewState', open));
   private readonly pasteboard: MacPasteboardWatcher | null;
   private readonly screenshots = new ScreenshotWatcher((path) => this.addExternalPaths([path]));
@@ -526,6 +533,19 @@ class Controller {
     }
   }
 
+  private setPositions(next: ShelfPositions): void {
+    this.positions = next;
+    if (this.positionsSave) clearTimeout(this.positionsSave);
+    // macOS reports every step of a window drag; write once it settles.
+    this.positionsSave = setTimeout(() => this.positionsFile.write(this.positions), 500);
+    this.refreshTrayMenu();
+  }
+
+  private resetShelfPosition(): void {
+    this.setPositions({});
+    if (this.shelf.visible) this.shelf.showAt(this.settings.get().side, screen.getCursorScreenPoint());
+  }
+
   /** Drags one member out of the previewed stack; a completed drop takes it out of the stack. */
   private dragStackMember(index: number, sender: Electron.WebContents): void {
     const id = this.preview.openId;
@@ -631,6 +651,7 @@ class Controller {
       { label: 'Add Clipboard to Shelf', click: () => void this.clipboardToShelf() },
       { label: 'Restore Removed Items', enabled: this.store.hasRemoved(), click: () => this.store.restoreLastRemoved() },
       { label: 'Clear Shelf', enabled: this.store.items().length > 0, click: () => this.store.clear() },
+      { label: 'Reset Shelf Position', visible: Object.keys(this.positions).length > 0, click: () => this.resetShelfPosition() },
       { type: 'separator' },
       { label: 'Clipboard History…', click: () => this.openClipboardWindow() },
       { label: 'Settings…', click: () => this.openSettingsWindow() },
@@ -851,7 +872,8 @@ class Controller {
       if (s.addScreenshots) void this.screenshots.start();
       else this.screenshots.stop();
     }
-    if (keys.includes('side') && this.shelf.visible) this.shelf.showAt(s.side, screen.getCursorScreenPoint());
+    // Picking a side means "put it at that edge", which beats where it was dragged before.
+    if (keys.includes('side')) this.resetShelfPosition();
     this.refreshTrayMenu();
   }
 

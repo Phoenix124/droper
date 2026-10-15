@@ -56,7 +56,7 @@ Start dragging, drop it on the shelf, take your time, drag it out wherever it be
 | 🗑️ **Clean up** | *Compress to ZIP* puts an archive of the selection on the shelf. *Move to Trash* deletes the files behind selected items; the menu-bar icon shows how many items are waiting. |
 | 🔒 **Lock & undo** | Locked items stay after drag-out. *Restore Removed Items* brings back the last removal. |
 | 🙈 **Ignored apps** | No shelf for drags from apps you choose, with one-click buttons for recent drag sources. |
-| 📐 **Your size** | Shelf width, height and icon size, applied live. |
+| 📐 **Your size and place** | Shelf width, height and icon size, applied live. Move the shelf and it reopens there on that display. |
 | 📸 **Screenshots** | Optional. New screenshots land on the shelf as soon as they are saved. |
 | 📋 **Clipboard history** | Optional. Text, links, images and files with pins, search and filters. |
 | 🔗 **Automation** | `droper://` links for Shortcuts, Alfred, Raycast or scripts. |
