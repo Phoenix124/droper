@@ -159,6 +159,20 @@ export class ShelfStore {
     return parts;
   }
 
+  /**
+   * Takes one path out of a stack (e.g. after it was dragged out on its own). The path becomes the
+   * restorable "last removed" item. Locked stacks keep their paths unless forced.
+   */
+  removePath(id: string, path: string, { force = false } = {}): ShelfItem | null {
+    const item = this.state.items.find((i) => i.id === id);
+    if (!item || item.kind !== 'stack' || (item.locked && !force) || !item.paths.includes(path)) return null;
+    this.setPaths(item, item.paths.filter((p) => p !== path));
+    const taken = this.makeItem('file', [path], item.snippet);
+    this.replaceRemoved([taken]);
+    this.commit();
+    return { ...taken, paths: [...taken.paths] };
+  }
+
   pathsFor(ids: string[]): string[] {
     const wanted = new Set(ids);
     return this.state.items.filter((i) => wanted.has(i.id)).flatMap((i) => i.paths);

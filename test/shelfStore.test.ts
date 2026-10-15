@@ -186,5 +186,30 @@ describe('ShelfStore', () => {
     const [restored] = store.restoreLastRemoved();
     expect(restored).toMatchObject({ kind: 'file', paths: ['/a/two.png'], name: 'two.png' });
   });
-});
 
+  it('removePath takes one file out of a stack, keeping it restorable', () => {
+    const items = store.addPaths(['/a/one.txt', '/a/two.png', '/b/three.pdf']);
+    const s = store.mergeToStack(items.map((i) => i.id))!;
+    const taken = store.removePath(s.id, '/a/two.png');
+    expect(taken).toMatchObject({ kind: 'file', paths: ['/a/two.png'] });
+    expect(store.items()).toMatchObject([{ id: s.id, kind: 'stack', paths: ['/a/one.txt', '/b/three.pdf'], name: '2 items' }]);
+    store.restoreLastRemoved();
+    expect(store.items().flatMap((i) => i.paths)).toContain('/a/two.png');
+  });
+
+  it('removePath collapses a two-item stack into a file', () => {
+    const [a, b] = store.addPaths(['/a/one.txt', '/a/two.png']);
+    const s = store.mergeToStack([a.id, b.id])!;
+    store.removePath(s.id, '/a/one.txt');
+    expect(store.items()).toMatchObject([{ id: s.id, kind: 'file', paths: ['/a/two.png'], name: 'two.png' }]);
+  });
+
+  it('removePath leaves locked stacks and unknown paths alone', () => {
+    const [a, b] = store.addPaths(['/a/one.txt', '/a/two.png']);
+    const s = store.mergeToStack([a.id, b.id])!;
+    expect(store.removePath(s.id, '/nope')).toBeNull();
+    store.setLocked([s.id], true);
+    expect(store.removePath(s.id, '/a/one.txt')).toBeNull();
+    expect(store.items()[0].paths).toHaveLength(2);
+  });
+});

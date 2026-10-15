@@ -107,6 +107,10 @@ export class PreviewWindow {
 
   constructor(private readonly onState: (open: boolean) => void) {}
 
+  get window(): BrowserWindow | null {
+    return this.win && !this.win.isDestroyed() ? this.win : null;
+  }
+
   get openId(): string | null {
     return this.win?.isVisible() ? this.current : null;
   }

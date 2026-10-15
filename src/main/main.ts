@@ -487,6 +487,33 @@ class Controller {
     this.store.remove(items.map((i) => i.id));
   }
 
+  /** Drags one member out of the previewed stack; a completed drop takes it out of the stack. */
+  private dragStackMember(index: number, sender: Electron.WebContents): void {
+    const id = this.preview.openId;
+    const item = this.store.items().find((i) => i.id === id);
+    const path = item?.kind === 'stack' ? item.paths[index] : undefined;
+    const win = this.preview.window;
+    if (!item || !path || !existsSync(path) || !win) return;
+    const native = nativeDrag();
+    try {
+      const onEnd = (end: NativeDragEnd) => {
+        const p = isWin ? screen.screenToDipPoint({ x: end.x, y: end.y }) : { x: end.x, y: end.y };
+        const bounds = this.shelf.bounds();
+        const remove = shouldRemoveAfterDragOut({
+          operation: end.operation,
+          endedOnShelf: bounds !== null && contains(bounds, p),
+          removeAfterDragOut: this.settings.get().removeAfterDragOut,
+        });
+        if (remove) this.store.removePath(item.id, path);
+      };
+      if (native?.startDrag(win.getNativeWindowHandle(), [path], onEnd)) return;
+    } catch (err) {
+      console.error('Native drag failed, falling back', err);
+    }
+    // Without the addon there is no drop result, so the stack stays as it is.
+    sender.startDrag({ file: path, icon: dragIconFor([path]) });
+  }
+
   private async itemViews(): Promise<ItemView[]> {
     return Promise.all(
       this.store.items().map(async (i) => {
@@ -830,6 +857,7 @@ class Controller {
       [this.shelf.win, 'shelf.html'],
       [this.settingsWin, 'settings.html'],
       [this.clipWin, 'clipboard.html'],
+      [this.preview.window, 'preview.html'],
     ];
     return pages.some(
       ([w, page]) => w !== null && !w.isDestroyed() && w.webContents === e.sender && frame.url === pageUrl(page),
@@ -868,6 +896,9 @@ class Controller {
     this.on('shelf:quickLook', (_e, raw) => this.toggleQuickLook(ids(raw)));
     this.on('shelf:previewFollow', (_e, raw) => this.followPreview(ids(raw)));
     this.on('shelf:closePreview', () => this.preview.hide());
+    this.on('preview:startDrag', (e, index) => {
+      if (Number.isInteger(index)) this.dragStackMember(index, e.sender);
+    });
     this.on('shelf:remove', (_e, raw) => this.store.remove(ids(raw)));
     this.handle('shelf:rename', (_e, id, name) => (typeof id === 'string' && typeof name === 'string' ? this.renameItem(id, name) : null));
     this.on('shelf:move', (_e, raw, to) => {

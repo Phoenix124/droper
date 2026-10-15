@@ -50,7 +50,7 @@ Start dragging, drop it on the shelf, take your time, drag it out wherever it be
 | 🪄 **Shows up when you drag** | When a drag starts, at the screen edge, under the pointer, or when you shake the pointer mid-drag. On macOS it reacts only to real drag sessions, not text selection or window moves. |
 | 📦 **Takes anything** | Files and folders (kept as references; *Keep a Copy* stores a copy so an item survives the original moving), text → `.txt`, links → `.webloc` / `.url`, images straight from the browser. |
 | 🎯 **Precise drag-out** | A native addon asks the OS whether the target app accepted the files. Cancelled or refused drops leave items where they are. |
-| 🗂️ **Stacks** | Merge items into one stack, drag it out in one go, split it back. |
+| 🗂️ **Stacks** | Merge items into one stack, drag it out in one go, split it back, or drag single files out of the stack preview. |
 | 👀 **Preview** | <kbd>Space</kbd> opens a popover next to the shelf: images, PDF, text, video, audio, Quick Look thumbnails, folders, stacks. |
 | 🔍 **Search** | <kbd>⌘F</kbd> / <kbd>Ctrl+F</kbd> filters by name and path. |
 | 🗑️ **Clean up** | *Move to Trash* deletes the files behind selected items; the menu-bar icon shows how many items are waiting. |

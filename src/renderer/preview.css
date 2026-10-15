@@ -34,6 +34,7 @@ html, body { background: transparent; overflow: hidden; }
 .content.stack { align-items: flex-start; overflow-y: auto; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 14px; width: 100%; }
 .cell { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; text-align: center; word-break: break-word; }
+.cell { cursor: grab; }
 .cell img { width: 80px; height: 80px; object-fit: contain; }
 
 .empty { color: var(--fg-muted); }

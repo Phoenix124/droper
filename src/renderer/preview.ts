@@ -40,12 +40,16 @@ function show(p: PreviewPayload): void {
     }
     case 'stack': {
       const grid = el('div', { className: 'grid' });
-      for (const e of p.entries ?? []) {
-        const cell = el('div', { className: 'cell' });
-        if (e.thumb) cell.append(el('img', { src: e.thumb, alt: '' }));
+      (p.entries ?? []).forEach((e, index) => {
+        const cell = el('div', { className: 'cell', draggable: true, title: 'Drag out on its own' });
+        cell.addEventListener('dragstart', (ev) => {
+          ev.preventDefault();
+          window.droperPreview.startDrag(index);
+        });
+        if (e.thumb) cell.append(el('img', { src: e.thumb, alt: '', draggable: false }));
         cell.append(el('span', { textContent: e.name }));
         grid.append(cell);
-      }
+      });
       content.replaceChildren(grid);
       break;
     }

@@ -119,4 +119,6 @@ export interface PreviewPayload {
 
 export interface PreviewApi {
   onShow(cb: (payload: PreviewPayload) => void): void;
+  /** Drags one member of the previewed stack out, by its index in the stack. */
+  startDrag(index: number): void;
 }
