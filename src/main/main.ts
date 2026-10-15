@@ -100,6 +100,8 @@ if (!app.requestSingleInstanceLock()) {
     e.preventDefault();
     openPaths([path]);
   });
+  // Clicking the app icon again while it runs (Dock, Launchpad, Finder) shows the shelf.
+  app.on('activate', () => controller?.showShelfOnLaunch());
   app.on('open-url', (e, url) => {
     e.preventDefault();
     openUrls([url]);
@@ -129,6 +131,10 @@ if (!app.requestSingleInstanceLock()) {
     controller = new Controller();
     openPaths([...pendingPaths, ...pathsFromArgv(process.argv)]);
     openUrls([...pendingUrls, ...urlsFromArgv(process.argv)]);
+    // A menu-bar app shows no window on launch; when the user starts it by hand, show the shelf so
+    // something visibly happens. Stay quiet when launched at login.
+    const atLogin = app.getLoginItemSettings().wasOpenedAtLogin || process.argv.includes('--hidden');
+    if (!atLogin && !pendingPaths.length && !pendingUrls.length) controller.showShelfOnLaunch();
     pendingPaths.length = 0;
     pendingUrls.length = 0;
   });
@@ -226,6 +232,10 @@ class Controller {
   }
 
   // ---- shelf visibility -------------------------------------------------
+
+  showShelfOnLaunch(): void {
+    if (!this.shelf.visible) this.showShelf();
+  }
 
   toggleShelf(): void {
     if (this.shelf.visible) this.shelf.hide();

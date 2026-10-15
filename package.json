@@ -38,7 +38,9 @@
       "extendInfo": {
         "LSUIElement": true,
         "NSAccessibilityUsageDescription": "Droper watches mouse drags to show its shelf when you start dragging."
-      }
+      },
+      "identity": "-",
+      "hardenedRuntime": false
     },
     "win": {
       "target": [
