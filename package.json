@@ -11,14 +11,16 @@
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
     "dist:mac": "npm run build && electron-builder --mac",
-    "dist:win": "npm run build && electron-builder --win"
+    "dist:win": "npm run build && electron-builder --win",
+    "icon": "node scripts/gen-icon.mjs"
   },
   "build": {
     "appId": "com.droper.app",
     "files": [
       "dist/**",
-      "assets/**",
-      "package.json"
+      "package.json",
+      "!node_modules/uiohook-napi/build/**",
+      "!node_modules/uiohook-napi/{src,libuiohook}/**"
     ],
     "mac": {
       "category": "public.app-category.productivity",
@@ -26,14 +28,34 @@
         "dmg"
       ],
       "extendInfo": {
-        "LSUIElement": true
+        "LSUIElement": true,
+        "NSAccessibilityUsageDescription": "Droper watches mouse drags to show its shelf when you start dragging."
       }
     },
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ]
-    }
+    },
+    "icon": "assets/icon.png",
+    "directories": {
+      "output": "release"
+    },
+    "asarUnpack": [
+      "node_modules/uiohook-napi/**"
+    ],
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "npmRebuild": false
   },
   "devDependencies": {
     "@types/node": "26.6.5",
