@@ -35,6 +35,7 @@ export interface SettingsView {
   launchAtLogin: boolean;
   clipboardHistory: boolean;
   clipboardLimit: number;
+  addScreenshots: boolean;
   shelfWidth: number;
   shelfHeight: number;
   iconSize: 'small' | 'medium' | 'large';

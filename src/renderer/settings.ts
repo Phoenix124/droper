@@ -6,7 +6,7 @@ const field = <T extends HTMLElement>(id: keyof SettingsView) => document.getEle
 const selects = ['trigger', 'side', 'iconSize'] as const;
 const ranges = ['shelfWidth', 'shelfHeight'] as const;
 let current: SettingsView | null = null;
-const checks = ['removeAfterDragOut', 'autoHide', 'clipboardHistory', 'launchAtLogin', 'confirmUrlActions'] as const;
+const checks = ['removeAfterDragOut', 'autoHide', 'clipboardHistory', 'launchAtLogin', 'confirmUrlActions', 'addScreenshots'] as const;
 
 function fill(s: SettingsView): void {
   current = s;

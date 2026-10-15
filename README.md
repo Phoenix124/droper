@@ -56,6 +56,7 @@ Start dragging, drop it on the shelf, take your time, drag it out wherever it be
 | 🔒 **Lock & undo** | Locked items stay after drag-out. *Restore Removed Items* brings back the last removal. |
 | 🙈 **Ignored apps** | No shelf for drags from apps you choose, with one-click buttons for recent drag sources. |
 | 📐 **Your size** | Shelf width, height and icon size, applied live. |
+| 📸 **Screenshots** | Optional. New screenshots land on the shelf as soon as they are saved. |
 | 📋 **Clipboard history** | Optional. Text, links, images and files with pins, search and filters. |
 | 🔗 **Automation** | `droper://` links for Shortcuts, Alfred, Raycast or scripts. |
 | ⚙️ **Fits in** | Menu bar / tray (drop files or text on the menu-bar icon on macOS), global shortcut, launch at login, Explorer *Send to → Droper*. |

@@ -46,6 +46,7 @@ import {
   writeClipboardText,
 } from './platform.js';
 import { PreviewWindow } from './previewWindow.js';
+import { ScreenshotWatcher } from './screenshotWatcher.js';
 import { ShelfWindow } from './shelfWindow.js';
 import { trayIcon } from './trayIcon.js';
 
@@ -151,6 +152,7 @@ class Controller {
   private readonly shelf = new ShelfWindow();
   private readonly preview = new PreviewWindow((open) => this.shelf.send('shelf:previewState', open));
   private readonly pasteboard: MacPasteboardWatcher | null;
+  private readonly screenshots = new ScreenshotWatcher((path) => this.addExternalPaths([path]));
   private readonly watcher: DragWatcher;
   private readonly tray: Tray;
   private settingsWin: BrowserWindow | null = null;
@@ -217,7 +219,7 @@ class Controller {
     this.settings.onChange((keys) => this.applySettings(keys));
 
     this.registerIpc();
-    this.applySettings(['hotkey', 'launchAtLogin', 'clipboardHistory', 'shelfWidth']);
+    this.applySettings(['hotkey', 'launchAtLogin', 'clipboardHistory', 'shelfWidth', 'addScreenshots']);
     this.startHookWhenPermitted();
     this.installSendTo();
 
@@ -251,6 +253,7 @@ class Controller {
       globalShortcut.unregisterAll();
       this.watcher.stop();
       this.pasteboard?.stop();
+      this.screenshots.stop();
     });
   }
 
@@ -732,6 +735,10 @@ class Controller {
         this.history.clear({ includePinned: true });
         this.cleanupClipImages();
       }
+    }
+    if (keys.includes('addScreenshots')) {
+      if (s.addScreenshots) void this.screenshots.start();
+      else this.screenshots.stop();
     }
     if (keys.includes('side') && this.shelf.visible) this.shelf.showAt(s.side, screen.getCursorScreenPoint());
     this.refreshTrayMenu();
