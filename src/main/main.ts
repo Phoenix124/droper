@@ -14,11 +14,14 @@ import {
   type IpcMainInvokeEvent,
   type MenuItemConstructorOptions,
 } from 'electron';
+import { execFile } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { cp } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
+import { archiveName, entryNames } from '../core/archive.js';
 import { ClipboardHistory, type ClipContent, type ClipEntry } from '../core/clipboardHistory.js';
 import { contains, type Point } from '../core/dragDetector.js';
 import { shouldRemoveAfterDragOut } from '../core/dragOut.js';
@@ -58,6 +61,11 @@ const MAX_SNIPPET_BYTES = 200 * 1024 * 1024;
 const pendingPaths: string[] = [];
 const pendingUrls: string[] = [];
 let controller: Controller | null = null;
+
+const run = promisify(execFile);
+// tar operands go in as "./name" so names starting with "-" or "@" can't pass as options or archive
+// includes; this strips the "./" again inside the archive.
+const TAR_STRIP_DOT = ['-s', ',^\\./,,'];
 
 function openPaths(paths: string[]): void {
   if (controller) controller.addExternalPaths(paths);
@@ -487,6 +495,37 @@ class Controller {
     this.store.remove(items.map((i) => i.id));
   }
 
+  /** Zips the selection into Droper's storage and puts the archive on the shelf as a new item. */
+  private async compress(ids: string[]): Promise<void> {
+    const paths = this.store.pathsFor(ids).filter((p) => existsSync(p));
+    if (!paths.length) return;
+    const dir = join(this.copiesDir, randomUUID());
+    const dest = join(dir, archiveName(paths));
+    const names = entryNames(paths);
+    try {
+      mkdirSync(dir, { recursive: true });
+      if (isWin) {
+        // bsdtar ships with Windows 10+; -C per item keeps each at the archive root.
+        if (new Set(names).size !== names.length || names.some((n, i) => n !== basename(paths[i]))) {
+          throw new Error('Items with the same name cannot be zipped together on Windows');
+        }
+        await run('tar.exe', ['-a', '-c', ...TAR_STRIP_DOT, '-f', dest, ...paths.flatMap((p) => ['-C', dirname(p), `./${basename(p)}`])]);
+      } else {
+        // Symlinks give every item its (deduplicated) name at the archive root; -h stores what they point to.
+        const stage = join(dir, '.stage');
+        mkdirSync(stage);
+        paths.forEach((p, i) => symlinkSync(p, join(stage, names[i])));
+        await run('/usr/bin/tar', ['-a', '-c', '-h', '--no-mac-metadata', '--exclude', '.DS_Store', ...TAR_STRIP_DOT, '-f', dest, '-C', stage, ...names.map((n) => `./${n}`)]);
+        rmSync(stage, { recursive: true, force: true });
+      }
+      this.store.addPaths([dest]);
+    } catch (err) {
+      rmSync(dir, { recursive: true, force: true });
+      console.error('Compress failed', err);
+      void dialog.showMessageBox({ type: 'error', message: 'Could not create the ZIP archive', detail: String((err as Error).message ?? err) });
+    }
+  }
+
   /** Drags one member out of the previewed stack; a completed drop takes it out of the stack. */
   private dragStackMember(index: number, sender: Electron.WebContents): void {
     const id = this.preview.openId;
@@ -631,6 +670,7 @@ class Controller {
       { label: 'Rename…', enabled: single?.kind === 'file', click: () => sender.send('shelf:beginRename', single!.id) },
       { label: anyUnlocked ? 'Lock' : 'Unlock', click: () => this.store.setLocked(ids, anyUnlocked) },
       { label: 'Merge into Stack', enabled: selected.length > 1, click: () => this.store.mergeToStack(ids) },
+      { label: 'Compress to ZIP', click: () => void this.compress(ids) },
       { label: 'Split Stack', visible: single?.kind === 'stack', click: () => this.store.splitStack(single!.id) },
       { label: 'Keep a Copy', enabled: anyReference, click: () => void this.keepCopies(ids) },
       { type: 'separator' },
