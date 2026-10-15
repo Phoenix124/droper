@@ -1,63 +1,69 @@
 # Droper
 
-Кросс-платформенная (macOS + Windows) «полка» для drag & drop: начинаешь тащить файл — сбоку экрана появляется шелф, бросаешь туда, спокойно переключаешься между окнами/спейсами/fullscreen-приложениями и потом вытаскиваешь файлы куда нужно.
+**English** · [Русский](README.ru.md)
 
-Electron + TypeScript, глобальный хук мыши через `uiohook-napi`.
+A cross-platform (macOS + Windows) drag & drop shelf. Start dragging a file and a shelf slides in at the edge of the screen. Drop it there, switch windows, Spaces or full-screen apps at your own pace, then drag it out wherever it needs to go.
 
-## Возможности
+Built with Electron + TypeScript; a global mouse hook via `uiohook-napi` detects drags.
+
+## Features
 
 | | |
 |---|---|
-| Появление шелфа | при начале drag, при подтаскивании к краю экрана, под курсором, или только по хоткею |
-| Что принимает | файлы и папки (хранятся ссылки, файлы не копируются), текст → `.txt`, ссылки → `.webloc`/`.url`, картинки из браузера → файл |
-| Вытаскивание | одного, нескольких или стека; после drag-out элементы убираются (настраивается), заблокированные остаются |
-| Стеки | объединить выделенное в стек, разбить стек обратно |
-| Контекстное меню | Open, Quick Look, Show in Finder/Explorer, Copy / Copy Path, Share (mac), Rename, Lock, Merge/Split, Remove |
-| Клавиатура | Space — Quick Look, Enter — открыть, Delete — убрать, ⌘/Ctrl+A, стрелки, Esc — скрыть |
-| Восстановление | «Restore Removed Items» возвращает последнюю убранную пачку |
-| Clipboard history | опционально: текст, ссылки, картинки, файлы; pin, поиск, фильтры, «на шелф» |
-| Интеграция | трей/менюбар, глобальный хоткей (`CommandOrControl+Shift+Y`), автозапуск, «Отправить → Droper» в Explorer, Open With / drop на иконку |
-| Авто-очистка | файлы, удалённые/перемещённые в корзину, пропадают с шелфа |
+| Shelf trigger | when a drag starts, when you drag to the screen edge, at the mouse pointer, or only via shortcut/menu |
+| Accepts | files and folders (kept as references, never copied), text → `.txt`, links → `.webloc`/`.url`, images from browsers → image files |
+| Drag out | one item, several, or a whole stack; dragged-out items leave the shelf (configurable), locked items stay |
+| Stacks | merge a selection into a stack, split it back |
+| Preview | Space opens a popover next to the shelf: images, PDF, text, video/audio, Quick Look thumbnails for other files (macOS), folders, stack grid; arrows step through items, Esc closes |
+| Search | ⌘F / Ctrl+F or the 🔍 button filters by name and path; every word must match |
+| Context menu | Open, Quick Look, Show in Finder/Explorer, Copy / Copy Path, Share (macOS), Rename, Lock, Merge/Split, Remove |
+| Keyboard | Space preview, Enter open, Delete remove, ⌘/Ctrl+A, ⌘/Ctrl+F, arrows; Esc closes preview → search → shelf |
+| Undo | "Restore Removed Items" brings back the last removed batch |
+| Clipboard history | optional: text, links, images, files; pin, search, filters, send to shelf |
+| Integration | tray / menu bar, global shortcut (`CommandOrControl+Shift+Y`), launch at login, Explorer "Send to → Droper", Open With / drop on the app icon |
+| Auto cleanup | files deleted or moved to the Trash disappear from the shelf |
 
-## Разработка
+## Development
 
 ```bash
 npm install
-npm test          # unit-тесты ядра (vitest)
-npm start         # сборка + запуск
+npm test          # core unit tests (vitest)
+npm start         # build + run
 ```
 
-На macOS при первом запуске нужно дать **Accessibility** (Системные настройки → Конфиденциальность → Универсальный доступ). В dev-режиме разрешение выдаётся `Electron.app`/терминалу. Без него шелф работает, но сам при drag не появится — только по хоткею/меню.
+On macOS, grant **Accessibility** on first launch (System Settings → Privacy & Security → Accessibility). In development the permission belongs to `Electron.app` / your terminal. Without it the shelf still works, but it won't appear on its own when you drag — only via the shortcut or menu.
 
-## Сборка
+## Building
 
 ```bash
 npm run dist:mac  # release/Droper-<ver>-arm64.dmg
-npm run dist:win  # release/Droper Setup <ver>.exe (x64 + arm64), собирается и с macOS
+npm run dist:win  # release/Droper Setup <ver>.exe (x64 + arm64), can be built on macOS too
 ```
 
-GitHub Actions (`.github/workflows/build.yml`) собирает оба на тег `v*`. Подписи/нотаризации нет — для публичного распространения нужны Apple Developer ID и Windows code signing.
+GitHub Actions (`.github/workflows/build.yml`) builds both on `v*` tags. Builds are not signed or notarized; public distribution needs an Apple Developer ID and a Windows code-signing certificate.
 
-## Архитектура
+## Architecture
 
 ```
-src/core/      чистая логика без Electron, покрыта тестами
-  shelfStore       элементы, стеки, lock, remove/restore, prune
-  dragDetector     state machine: mouse down/move/up → «показать шелф»
-  ingest           сохранение текста/ссылок/картинок в файлы
-  clipboardHistory история буфера
-  settings         настройки с валидацией
-src/main/      Electron main: окно-панель, трей, IPC, хук мыши, буфер
-src/preload/   contextBridge API
-src/renderer/  UI шелфа, настроек и истории буфера (vanilla TS)
+src/core/      pure logic without Electron, covered by tests
+  shelfStore       items, stacks, lock, remove/restore, prune
+  dragDetector     state machine: mouse down/move/up → "show the shelf"
+  ingest           saves dropped text/links/images as files
+  clipboardHistory clipboard history
+  settings         validated settings
+  preview          preview kind and popover placement
+src/main/      Electron main: panel windows, tray, IPC, mouse hook, clipboard
+src/preload/   contextBridge APIs
+src/renderer/  shelf, preview, settings and clipboard history UI (vanilla TS)
 ```
 
-Как отличается «настоящий» drag от выделения текста или перетаскивания окна:
-- **macOS**: фоновый JXA-процесс следит за `changeCount` системного drag-пастборда; шелф показывается, только если какое-то приложение действительно начало drag-сессию.
-- **Windows**: аналога нет, поэтому по умолчанию режим «к краю экрана»; ложные срабатывания гасятся авто-скрытием пустого шелфа.
+Telling a real drag apart from selecting text or moving a window:
+- **macOS**: a background JXA process watches the `changeCount` of the system drag pasteboard; the shelf only appears when some app actually started a drag session.
+- **Windows**: there is no equivalent, so the default trigger is "drag to the screen edge"; false positives are absorbed by auto-hiding an empty shelf.
 
-## Ограничения
+## Limitations
 
-- Нет Handoff/iCloud, Services-меню macOS, виджетов, Shortcuts.
-- Windows: «Copy» кладёт пути текстом (Electron не пишет CF_HDROP), Quick Look — простое окно предпросмотра. Чтение нескольких скопированных файлов идёт через `text/uri-list` (проверено на macOS, на Windows ещё нет).
-- Удаление после drag-out определяется по месту отпускания мыши (вне шелфа = перенесено). Отменённый drag тоже считается — для этого есть «Restore Removed Items».
+- No Handoff/iCloud, macOS Services menu, widgets or Shortcuts actions.
+- The preview is custom (not the system QLPreviewPanel): formats without a thumbnail generator show their icon.
+- Windows: "Copy" puts paths as text (Electron can't write CF_HDROP). Reading several copied files goes through `text/uri-list` (verified on macOS, not yet on Windows).
+- Removal after drag-out is decided by where the mouse is released (outside the shelf = moved). A cancelled drag counts too — that's what "Restore Removed Items" is for.
