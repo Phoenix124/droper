@@ -1,7 +1,7 @@
 {
   "name": "droper",
   "productName": "Droper",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "Cross-platform drag & drop shelf for macOS and Windows",
   "license": "MIT",
   "repository": {
