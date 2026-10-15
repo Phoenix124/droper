@@ -184,7 +184,7 @@ class Controller {
     });
     this.cleanupClipImages();
 
-    this.pasteboard = isMac ? new MacPasteboardWatcher(() => void this.captureClipboard()) : null;
+    this.pasteboard = isMac && MacPasteboardWatcher.available() ? new MacPasteboardWatcher(() => void this.captureClipboard()) : null;
     this.pasteboard?.start();
 
     this.watcher = new DragWatcher(
@@ -572,8 +572,8 @@ class Controller {
   private async startClipboardHistory(): Promise<void> {
     this.latestClip = await this.snapshotToContent();
     this.history.prime();
-    // macOS reacts to pasteboard change notifications; Windows has to poll.
-    if (!isMac && !this.clipTimer) this.clipTimer = setInterval(() => void this.captureClipboard(), 1000);
+    // The macOS pasteboard watcher reports copies; without it (Windows, or no addon) poll.
+    if (!this.pasteboard && !this.clipTimer) this.clipTimer = setInterval(() => void this.captureClipboard(), 1000);
   }
 
   private stopClipboardHistory(): void {

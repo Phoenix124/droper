@@ -16,6 +16,8 @@ interface NativeDragAddon {
   startDrag(handle: Buffer, paths: string[], onEnd: (end: NativeDragEnd) => void): boolean;
   /** Takes points (macOS) or physical pixels (Windows). */
   appAtPoint(x: number, y: number): AppIdentity | null;
+  /** macOS only: [drag pasteboard changeCount, general pasteboard changeCount]. */
+  pasteboardCounts?(): [number, number];
 }
 
 let addon: NativeDragAddon | null | undefined;

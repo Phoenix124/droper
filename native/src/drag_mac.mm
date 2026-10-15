@@ -197,8 +197,23 @@ static napi_value AppAtPoint(napi_env env, napi_callback_info info) {
   return result;
 }
 
+// pasteboardCounts(): [dragChangeCount, generalChangeCount]. The drag pasteboard changes whenever
+// any app starts a real drag session; the general one on every copy.
+static napi_value PasteboardCounts(napi_env env, napi_callback_info) {
+  static NSPasteboard* drag = [NSPasteboard pasteboardWithName:NSPasteboardNameDrag];
+  napi_value result, d, g;
+  napi_create_array_with_length(env, 2, &result);
+  napi_create_int64(env, drag.changeCount, &d);
+  napi_create_int64(env, NSPasteboard.generalPasteboard.changeCount, &g);
+  napi_set_element(env, result, 0, d);
+  napi_set_element(env, result, 1, g);
+  return result;
+}
+
 static napi_value Init(napi_env env, napi_value exports) {
   napi_value fn;
+  napi_create_function(env, "pasteboardCounts", NAPI_AUTO_LENGTH, PasteboardCounts, nullptr, &fn);
+  napi_set_named_property(env, exports, "pasteboardCounts", fn);
   napi_create_function(env, "startDrag", NAPI_AUTO_LENGTH, StartDrag, nullptr, &fn);
   napi_set_named_property(env, exports, "startDrag", fn);
   napi_create_function(env, "appAtPoint", NAPI_AUTO_LENGTH, AppAtPoint, nullptr, &fn);

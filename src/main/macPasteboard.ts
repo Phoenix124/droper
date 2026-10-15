@@ -1,54 +1,37 @@
-import { spawn, type ChildProcess } from 'node:child_process';
-import { createInterface } from 'node:readline';
+import { nativeDrag } from './nativeDrag.js';
 
-// JXA loop that prints "<dragChangeCount> <generalChangeCount>" whenever either changes.
-// It exits on its own once orphaned (parent pid becomes launchd), so it never outlives Droper.
-const SCRIPT = `
-ObjC.import('AppKit');
-ObjC.import('unistd');
-const drag = $.NSPasteboard.pasteboardWithName('Apple CFPasteboard drag');
-const general = $.NSPasteboard.generalPasteboard;
-let d = -1, g = -1;
-while ($.getppid() !== 1) {
-  const nd = drag.changeCount, ng = general.changeCount;
-  if (nd !== d || ng !== g) { d = nd; g = ng; console.log(d + ' ' + g); }
-  delay(0.04);
-}
-`;
+const POLL_MS = 40;
 
 /**
- * macOS only. Watches the system drag pasteboard (changes whenever any app starts a real
- * drag session) and the general pasteboard (changes on every copy).
+ * macOS only. Polls the system drag pasteboard (changes whenever any app starts a real drag
+ * session) and the general pasteboard (changes on every copy) through the native addon.
  */
 export class MacPasteboardWatcher {
   dragCount = -1;
   generalCount = -1;
-  private proc: ChildProcess | null = null;
-  private stopped = false;
+  private timer: NodeJS.Timeout | null = null;
 
   constructor(private readonly onGeneralChange: () => void) {}
 
+  /** False when the addon isn't built; callers then fall back to plain drag detection and polling. */
+  static available(): boolean {
+    return typeof nativeDrag()?.pasteboardCounts === 'function';
+  }
+
   start(): void {
-    this.stopped = false;
-    const proc = spawn('/usr/bin/osascript', ['-l', 'JavaScript', '-e', SCRIPT], { stdio: ['ignore', 'ignore', 'pipe'] });
-    this.proc = proc;
-    createInterface({ input: proc.stderr! }).on('line', (line) => {
-      const [d, g] = line.trim().split(' ').map(Number);
-      if (!Number.isFinite(d) || !Number.isFinite(g)) return;
+    const read = nativeDrag()?.pasteboardCounts;
+    if (!read || this.timer) return;
+    this.timer = setInterval(() => {
+      const [d, g] = read();
       this.dragCount = d;
       const generalChanged = this.generalCount >= 0 && g !== this.generalCount;
       this.generalCount = g;
       if (generalChanged) this.onGeneralChange();
-    });
-    proc.on('exit', () => {
-      if (this.proc === proc) this.proc = null;
-      if (!this.stopped) setTimeout(() => this.start(), 1000);
-    });
+    }, POLL_MS);
   }
 
   stop(): void {
-    this.stopped = true;
-    this.proc?.kill();
-    this.proc = null;
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
   }
 }
