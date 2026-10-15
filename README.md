@@ -59,5 +59,5 @@ src/renderer/  UI шелфа, настроек и истории буфера (v
 ## Ограничения
 
 - Нет Handoff/iCloud, Services-меню macOS, виджетов, Shortcuts.
-- Windows: «Copy» кладёт пути текстом (Electron не умеет CF_HDROP), clipboard history видит один файл из множества, Quick Look — простое окно предпросмотра.
+- Windows: «Copy» кладёт пути текстом (Electron не пишет CF_HDROP), Quick Look — простое окно предпросмотра. Чтение нескольких скопированных файлов идёт через `text/uri-list` (проверено на macOS, на Windows ещё нет).
 - Удаление после drag-out определяется по месту отпускания мыши (вне шелфа = перенесено). Отменённый drag тоже считается — для этого есть «Restore Removed Items».
