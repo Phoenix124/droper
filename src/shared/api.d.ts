@@ -49,12 +49,17 @@ export interface DroperApi {
     startDrag(ids: string[]): void;
     contextMenu(ids: string[]): void;
     open(ids: string[]): void;
-    quickLook(ids: string[]): void;
     remove(ids: string[]): void;
     rename(id: string, name: string): Promise<string | null>;
     move(ids: string[], toIndex: number): void;
     hide(): void;
     menu(): void;
+    /** Toggles the preview popover for the first id. */
+    quickLook(ids: string[]): void;
+    /** Shows the first id in the preview if it is already open. */
+    previewFollow(ids: string[]): void;
+    closePreview(): void;
+    onPreviewState(cb: (open: boolean) => void): void;
   };
   clipboard: {
     list(): Promise<ClipEntryView[]>;
@@ -71,4 +76,28 @@ export interface DroperApi {
     accessibilityStatus(): Promise<boolean>;
     requestAccessibility(): void;
   };
+}
+
+export interface PreviewEntry {
+  name: string;
+  thumb: string | null;
+}
+
+export interface PreviewPayload {
+  name: string;
+  /** e.g. "1.2 MB · PDF · 14 Oct 2026" */
+  info: string;
+  kind: 'image' | 'pdf' | 'text' | 'video' | 'audio' | 'folder' | 'other' | 'stack';
+  /** file:// URL for image, pdf, video and audio. */
+  src?: string;
+  text?: string;
+  truncated?: boolean;
+  /** Large thumbnail or icon for 'other' and 'folder'. */
+  thumb?: string | null;
+  /** Members of a stack. */
+  entries?: PreviewEntry[];
+}
+
+export interface PreviewApi {
+  onShow(cb: (payload: PreviewPayload) => void): void;
 }

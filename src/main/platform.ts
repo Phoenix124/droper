@@ -1,12 +1,10 @@
-import { app, BrowserWindow, clipboard, ClipboardItem, nativeImage, shell, type NativeImage } from 'electron';
-import { spawn } from 'node:child_process';
+import { app, clipboard, ClipboardItem, nativeImage, type NativeImage } from 'electron';
 import { statSync } from 'node:fs';
 import { extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { LruCache } from '../core/lruCache.js';
-import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.heic', '.ico']);
-const PREVIEWABLE_EXTS = new Set([...IMAGE_EXTS, '.pdf', '.txt', '.md', '.json', '.svg', '.mp4', '.webm', '.mp3', '.wav']);
 
 // Keyed by path + mtime + size so a file rewritten in place (or a reused snippet name) gets a fresh thumbnail.
 const thumbCache = new LruCache<string, NativeImage>(300);
@@ -71,33 +69,6 @@ function placeholderIcon(): NativeImage {
   }
   placeholder = nativeImage.createFromBitmap(buf, { width: size, height: size });
   return placeholder;
-}
-
-let previewWindow: BrowserWindow | null = null;
-
-export function quickLook(paths: string[]): void {
-  if (!paths.length) return;
-  if (process.platform === 'darwin') {
-    spawn('qlmanage', ['-p', ...paths], { stdio: 'ignore', detached: true }).unref();
-    return;
-  }
-  const path = paths[0];
-  if (!PREVIEWABLE_EXTS.has(extname(path).toLowerCase())) {
-    void shell.openPath(path);
-    return;
-  }
-  if (!previewWindow || previewWindow.isDestroyed()) {
-    previewWindow = new BrowserWindow({
-      width: 800,
-      height: 600,
-      title: 'Preview',
-      autoHideMenuBar: true,
-      webPreferences: { sandbox: true, contextIsolation: true, javascript: false },
-    });
-  }
-  void previewWindow.loadURL(pathToFileURL(path).href);
-  previewWindow.setTitle(path);
-  previewWindow.show();
 }
 
 const MAC_FILES = 'electron application/osclipboard;format="NSFilenamesPboardType"';

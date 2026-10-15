@@ -21,6 +21,8 @@ html, body { background: transparent; overflow: hidden; user-select: none; -webk
   padding: 0 6px;
   -webkit-app-region: drag;
 }
+.bar-right { display: flex; gap: 2px; }
+.bar .icon-btn { display: grid; place-items: center; }
 .grip { width: 28px; height: 4px; border-radius: 2px; background: var(--border); }
 .icon-btn {
   -webkit-app-region: no-drag;
@@ -146,3 +148,22 @@ html, body { background: transparent; overflow: hidden; user-select: none; -webk
 .panel.is-empty.drop-target .empty { border-color: var(--accent); color: var(--accent); }
 
 .count { height: 22px; font-size: 11px; color: var(--fg-muted); text-align: center; line-height: 22px; }
+
+.search-row { display: none; padding: 0 8px 6px; }
+.search-row.open { display: block; }
+.search-row input {
+  width: 100%;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--fg);
+  outline: none;
+  user-select: text;
+}
+.search-row input:focus { border-color: var(--accent); }
+
+.no-matches-note { display: none; text-align: center; color: var(--fg-muted); font-size: 12px; padding: 12px 0; }
+.panel.no-matches .no-matches-note { display: block; }

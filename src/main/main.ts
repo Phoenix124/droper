@@ -32,13 +32,13 @@ import {
   dragIconFor,
   forgetThumbnail,
   isImagePath,
-  quickLook,
   readClipboard,
   thumbnailFor,
   type ClipboardSnapshot,
   writeClipboardImage,
   writeClipboardText,
 } from './platform.js';
+import { PreviewWindow } from './previewWindow.js';
 import { ShelfWindow } from './shelfWindow.js';
 import { trayIcon } from './trayIcon.js';
 
@@ -98,6 +98,7 @@ class Controller {
   private readonly store: ShelfStore;
   private readonly history: ClipboardHistory;
   private readonly shelf = new ShelfWindow();
+  private readonly preview = new PreviewWindow((open) => this.shelf.send('shelf:previewState', open));
   private readonly pasteboard: MacPasteboardWatcher | null;
   private readonly watcher: DragWatcher;
   private readonly tray: Tray;
@@ -162,6 +163,9 @@ class Controller {
     this.installSendTo();
 
     this.shelf.win.webContents.once('did-finish-load', () => void this.broadcastItems());
+    // The preview is anchored to the shelf, so it goes away when the shelf hides or is dragged elsewhere.
+    this.shelf.win.on('hide', () => this.preview.hide());
+    this.shelf.win.on('move', () => this.preview.hide());
     setInterval(() => {
       if (this.shelf.visible) this.store.pruneMissing();
     }, 3000);
@@ -214,6 +218,7 @@ class Controller {
 
   private onStoreChange(): void {
     void this.broadcastItems();
+    this.refreshPreview();
     this.refreshTrayMenu();
     if (this.store.items().length === 0 && this.settings.get().autoHide && !this.watcher.isDragging) {
       this.shownByDrag = true;
@@ -290,6 +295,33 @@ class Controller {
     return name;
   }
 
+  // ---- preview ----------------------------------------------------------
+
+  private toggleQuickLook(ids: string[]): void {
+    const item = this.store.items().find((i) => i.id === ids[0]);
+    const bounds = this.shelf.bounds();
+    if (!item || !bounds) return;
+    if (this.preview.openId === item.id) this.preview.hide();
+    else void this.preview.show(item, bounds);
+  }
+
+  private followPreview(ids: string[]): void {
+    if (this.preview.openId === null || this.preview.openId === ids[0]) return;
+    const item = this.store.items().find((i) => i.id === ids[0]);
+    const bounds = this.shelf.bounds();
+    if (item && bounds) void this.preview.show(item, bounds);
+  }
+
+  /** Keeps an open preview in sync after renames, removals and stack changes. */
+  private refreshPreview(): void {
+    const id = this.preview.openId;
+    if (id === null) return;
+    const item = this.store.items().find((i) => i.id === id);
+    const bounds = this.shelf.bounds();
+    if (item && bounds) void this.preview.show(item, bounds);
+    else this.preview.hide();
+  }
+
   // ---- menus ------------------------------------------------------------
 
   private trayTemplate(): MenuItemConstructorOptions[] {
@@ -322,7 +354,7 @@ class Controller {
     const anyUnlocked = selected.some((i) => !i.locked);
     const template: MenuItemConstructorOptions[] = [
       { label: 'Open', click: () => paths.forEach((p) => void shell.openPath(p)) },
-      { label: 'Quick Look', click: () => quickLook(paths) },
+      { label: 'Quick Look', click: () => this.toggleQuickLook(ids) },
       { label: isMac ? 'Show in Finder' : 'Show in Explorer', click: () => shell.showItemInFolder(paths[0]) },
       { type: 'separator' },
       { label: isMac ? 'Copy' : 'Copy Path', click: () => void copyFiles(paths) },
@@ -581,7 +613,9 @@ class Controller {
       if (sel.length) this.itemMenu(sel, e.sender).popup({ window: this.shelf.win });
     });
     this.on('shelf:open', (_e, raw) => this.store.pathsFor(ids(raw)).forEach((p) => void shell.openPath(p)));
-    this.on('shelf:quickLook', (_e, raw) => quickLook(this.store.pathsFor(ids(raw))));
+    this.on('shelf:quickLook', (_e, raw) => this.toggleQuickLook(ids(raw)));
+    this.on('shelf:previewFollow', (_e, raw) => this.followPreview(ids(raw)));
+    this.on('shelf:closePreview', () => this.preview.hide());
     this.on('shelf:remove', (_e, raw) => this.store.remove(ids(raw)));
     this.handle('shelf:rename', (_e, id, name) => (typeof id === 'string' && typeof name === 'string' ? this.renameItem(id, name) : null));
     this.on('shelf:move', (_e, raw, to) => {

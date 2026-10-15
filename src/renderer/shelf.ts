@@ -1,12 +1,19 @@
 import type { DroppedSnippet, ItemView } from '../shared/api';
+import { filterItems } from './filter.js';
 import { rangeSelection } from './selection.js';
 
 const api = window.droper;
 const panel = document.getElementById('panel')!;
 const list = document.getElementById('items') as HTMLUListElement;
 const count = document.getElementById('count')!;
+const searchRow = document.getElementById('search-row')!;
+const search = document.getElementById('search') as HTMLInputElement;
 
 let items: ItemView[] = [];
+/** Items currently visible (after the search filter). */
+let shown: ItemView[] = [];
+let query = '';
+let previewOpen = false;
 const selected = new Set<string>();
 let anchor: string | null = null;
 let renaming: string | null = null;
@@ -14,14 +21,18 @@ let renaming: string | null = null;
 // ---- rendering ---------------------------------------------------------------
 
 function render(): void {
-  for (const id of [...selected]) if (!items.some((i) => i.id === id)) selected.delete(id);
-  if (anchor && !items.some((i) => i.id === anchor)) anchor = null;
+  shown = filterItems(items, query);
+  // Hidden items must not stay selected, or keyboard actions would hit things the user can't see.
+  for (const id of [...selected]) if (!shown.some((i) => i.id === id)) selected.delete(id);
+  if (anchor && !shown.some((i) => i.id === anchor)) anchor = null;
   panel.classList.toggle('is-empty', items.length === 0);
+  panel.classList.toggle('no-matches', items.length > 0 && shown.length === 0);
   const files = items.reduce((n, i) => n + i.count, 0);
-  count.textContent = items.length ? `${files} ${files === 1 ? 'item' : 'items'}` : '';
+  if (query) count.textContent = `${shown.length} of ${items.length}`;
+  else count.textContent = items.length ? `${files} ${files === 1 ? 'item' : 'items'}` : '';
 
   list.replaceChildren(
-    ...items.map((item) => {
+    ...shown.map((item) => {
       const li = document.createElement('li');
       li.className = `item ${item.kind}`;
       li.classList.toggle('selected', selected.has(item.id));
@@ -109,7 +120,7 @@ function itemIdFrom(target: EventTarget | null): string | null {
 function select(id: string, e: MouseEvent | KeyboardEvent): void {
   const toggle = api.platform === 'darwin' ? e.metaKey : e.ctrlKey;
   if (e.shiftKey) {
-    const range = rangeSelection(items.map((i) => i.id), anchor, id);
+    const range = rangeSelection(shown.map((i) => i.id), anchor, id);
     selected.clear();
     range.forEach((x) => selected.add(x));
     if (range.length === 1) anchor = id;
@@ -123,11 +134,53 @@ function select(id: string, e: MouseEvent | KeyboardEvent): void {
     anchor = id;
   }
   render();
+  followPreview();
 }
 
 function selection(): string[] {
-  return items.filter((i) => selected.has(i.id)).map((i) => i.id);
+  return shown.filter((i) => selected.has(i.id)).map((i) => i.id);
 }
+
+function followPreview(): void {
+  const sel = selection();
+  if (previewOpen && sel.length) api.shelf.previewFollow(sel);
+}
+
+// ---- search ---------------------------------------------------------------------
+
+function openSearch(): void {
+  searchRow.classList.add('open');
+  search.focus();
+  search.select();
+}
+
+function closeSearch(): void {
+  query = '';
+  search.value = '';
+  searchRow.classList.remove('open');
+  render();
+  list.focus();
+}
+
+search.addEventListener('input', () => {
+  query = search.value;
+  render();
+});
+
+search.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    closeSearch();
+  } else if (e.key === 'ArrowDown' || e.key === 'Enter') {
+    e.preventDefault();
+    e.stopPropagation();
+    if (shown[0]) {
+      list.focus();
+      select(shown[0].id, e);
+    }
+  }
+});
 
 list.addEventListener('mousedown', (e) => {
   const id = itemIdFrom(e.target);
@@ -160,10 +213,13 @@ list.addEventListener('contextmenu', (e) => {
 });
 
 document.addEventListener('keydown', (e) => {
-  if (renaming) return;
+  if (renaming || e.target === search) return;
   const sel = selection();
   const mod = api.platform === 'darwin' ? e.metaKey : e.ctrlKey;
-  if (e.key === ' ' && sel.length) {
+  if (mod && e.key.toLowerCase() === 'f') {
+    e.preventDefault();
+    openSearch();
+  } else if (e.key === ' ' && sel.length) {
     e.preventDefault();
     api.shelf.quickLook(sel);
   } else if (e.key === 'Enter' && sel.length) {
@@ -172,14 +228,18 @@ document.addEventListener('keydown', (e) => {
     api.shelf.remove(sel);
   } else if (mod && e.key.toLowerCase() === 'a') {
     e.preventDefault();
-    items.forEach((i) => selected.add(i.id));
+    shown.forEach((i) => selected.add(i.id));
     render();
   } else if (e.key === 'Escape') {
-    api.shelf.hide();
-  } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    // Peel back one layer at a time: preview, then search, then the shelf itself.
+    if (previewOpen) api.shelf.closePreview();
+    else if (searchRow.classList.contains('open')) closeSearch();
+    else api.shelf.hide();
+  } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
     e.preventDefault();
-    const idx = items.findIndex((i) => i.id === anchor);
-    const next = items[Math.min(items.length - 1, Math.max(0, idx + (e.key === 'ArrowDown' ? 1 : -1)))];
+    const step = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : -1;
+    const idx = shown.findIndex((i) => i.id === anchor);
+    const next = shown[Math.min(shown.length - 1, Math.max(0, idx + step))];
     if (next) select(next.id, e);
   }
 });
@@ -266,11 +326,12 @@ async function ingest(dt: DataTransfer, index: number): Promise<void> {
   }
 
   if (paths.length) {
-    // Dropping the shelf's own items back onto it reorders them.
+    // Dropping the shelf's own items back onto it reorders them (only meaningful when nothing is filtered out).
     const own = items.filter((i) => i.paths.every((p) => paths.includes(p)));
     const ownPaths = new Set(own.flatMap((i) => i.paths));
-    if (own.length && paths.every((p) => ownPaths.has(p))) api.shelf.move(own.map((i) => i.id), index);
-    else api.shelf.addFiles(paths);
+    if (own.length && paths.every((p) => ownPaths.has(p))) {
+      if (!query) api.shelf.move(own.map((i) => i.id), index);
+    } else api.shelf.addFiles(paths);
   }
   if (snippets.length) api.shelf.addSnippets(snippets);
 }
@@ -279,6 +340,14 @@ async function ingest(dt: DataTransfer, index: number): Promise<void> {
 
 document.getElementById('menu')!.addEventListener('click', () => api.shelf.menu());
 document.getElementById('close')!.addEventListener('click', () => api.shelf.hide());
+document.getElementById('search-btn')!.addEventListener('click', () => {
+  if (searchRow.classList.contains('open')) closeSearch();
+  else openSearch();
+});
+
+api.shelf.onPreviewState((open) => {
+  previewOpen = open;
+});
 
 api.shelf.onItems((next) => {
   items = next;

@@ -12,13 +12,22 @@
     <header class="bar">
       <button id="menu" class="icon-btn" title="Menu" aria-label="Menu">⋯</button>
       <span class="grip" aria-hidden="true"></span>
-      <button id="close" class="icon-btn" title="Hide shelf" aria-label="Hide shelf">✕</button>
+      <span class="bar-right">
+        <button id="search-btn" class="icon-btn" title="Search (⌘F / Ctrl+F)" aria-label="Search">
+          <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.5 10.5 14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+        <button id="close" class="icon-btn" title="Hide shelf" aria-label="Hide shelf">✕</button>
+      </span>
     </header>
+    <div id="search-row" class="search-row">
+      <input id="search" type="search" placeholder="Search" spellcheck="false" aria-label="Search shelf">
+    </div>
     <ul id="items" class="items" role="listbox" aria-multiselectable="true" tabindex="0"></ul>
     <div id="empty" class="empty">
       <div class="empty-icon" aria-hidden="true">⇩</div>
       <div>Drop files, text, links or images here</div>
     </div>
+    <div class="no-matches-note">No matches</div>
     <footer id="count" class="count"></footer>
   </div>
   <script type="module" src="shelf.js"></script>

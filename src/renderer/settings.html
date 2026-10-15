@@ -33,11 +33,11 @@
   </div>
   <div class="row">
     <label for="removeAfterDragOut">Remove items after dragging them out<span class="hint">Locked items always stay</span></label>
-    <input id="removeAfterDragOut" type="checkbox">
+    <input id="removeAfterDragOut" type="checkbox" role="switch">
   </div>
   <div class="row">
     <label for="autoHide">Hide shelf when it's empty</label>
-    <input id="autoHide" type="checkbox">
+    <input id="autoHide" type="checkbox" role="switch">
   </div>
   <div class="row">
     <label for="hotkey">Toggle shortcut<span class="hint">Electron accelerator, e.g. CommandOrControl+Shift+Y. Empty disables it.</span></label>
@@ -47,7 +47,7 @@
   <h2>Clipboard</h2>
   <div class="row">
     <label for="clipboardHistory">Record clipboard history<span class="hint">Turning it off deletes recorded history</span></label>
-    <input id="clipboardHistory" type="checkbox">
+    <input id="clipboardHistory" type="checkbox" role="switch">
   </div>
   <div class="row">
     <label for="clipboardLimit">Entries to keep<span class="hint">Pinned entries don't count</span></label>
@@ -57,7 +57,7 @@
   <h2>General</h2>
   <div class="row">
     <label for="launchAtLogin">Launch at login</label>
-    <input id="launchAtLogin" type="checkbox">
+    <input id="launchAtLogin" type="checkbox" role="switch">
   </div>
   <script type="module" src="settings.js"></script>
 </body>
