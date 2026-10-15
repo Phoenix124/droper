@@ -10,8 +10,8 @@
     "start": "npm run build && electron .",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
+    "dist:win": "npm run build && electron-builder --win --publish never",
     "icon": "node scripts/gen-icon.mjs"
   },
   "build": {
@@ -55,7 +55,13 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
     },
-    "npmRebuild": false
+    "npmRebuild": false,
+    "publish": [
+      {
+        "provider": "github",
+        "releaseType": "draft"
+      }
+    ]
   },
   "devDependencies": {
     "@types/node": "26.6.5",
