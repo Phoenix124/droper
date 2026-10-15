@@ -448,6 +448,19 @@ class Controller {
     }
   }
 
+  /** Locked items are left alone, as with every other removal. */
+  private async trashItems(ids: string[]): Promise<void> {
+    const items = this.store.items().filter((i) => ids.includes(i.id) && !i.locked);
+    for (const p of items.flatMap((i) => i.paths)) {
+      try {
+        await shell.trashItem(p);
+      } catch (err) {
+        console.error('Could not move to Trash', p, err);
+      }
+    }
+    this.store.remove(items.map((i) => i.id));
+  }
+
   private async itemViews(): Promise<ItemView[]> {
     return Promise.all(
       this.store.items().map(async (i) => {
@@ -567,6 +580,7 @@ class Controller {
       { label: 'Split Stack', visible: single?.kind === 'stack', click: () => this.store.splitStack(single!.id) },
       { type: 'separator' },
       { label: 'Remove from Shelf', enabled: anyUnlocked, click: () => this.store.remove(ids) },
+      { label: isMac ? 'Move to Trash' : 'Move to Recycle Bin', enabled: anyUnlocked, click: () => void this.trashItems(ids) },
     );
     return Menu.buildFromTemplate(template);
   }
