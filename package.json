@@ -1,0 +1,48 @@
+{
+  "name": "droper",
+  "productName": "Droper",
+  "version": "0.1.0",
+  "description": "Cross-platform drag & drop shelf for macOS and Windows",
+  "main": "dist/main/main.js",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.json && tsc -p tsconfig.renderer.json && node scripts/copy-static.mjs",
+    "start": "npm run build && electron .",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.droper.app",
+    "files": [
+      "dist/**",
+      "assets/**",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg"
+      ],
+      "extendInfo": {
+        "LSUIElement": true
+      }
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "electron": "44.7.2",
+    "electron-builder": "26.15.3",
+    "typescript": "7.0.2",
+    "vitest": "5.0.4"
+  },
+  "dependencies": {
+    "uiohook-napi": "1.5.5"
+  }
+}
