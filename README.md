@@ -58,7 +58,7 @@ Start dragging, drop it on the shelf, take your time, drag it out wherever it be
 | 📐 **Your size** | Shelf width, height and icon size, applied live. |
 | 📋 **Clipboard history** | Optional. Text, links, images and files with pins, search and filters. |
 | 🔗 **Automation** | `droper://` links for Shortcuts, Alfred, Raycast or scripts. |
-| ⚙️ **Fits in** | Menu bar / tray, global shortcut, launch at login, Explorer *Send to → Droper*. |
+| ⚙️ **Fits in** | Menu bar / tray (drop files or text on the menu-bar icon on macOS), global shortcut, launch at login, Explorer *Send to → Droper*. |
 
 ## ⌨️ Keyboard
 

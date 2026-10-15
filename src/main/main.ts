@@ -204,6 +204,12 @@ class Controller {
     this.tray.on('click', () => {
       if (isWin) this.toggleShelf();
     });
+    // macOS only: the menu-bar icon takes drops too, for when the shelf isn't showing.
+    this.tray.on('drop-files', (_e, files) => this.addExternalPaths(files));
+    this.tray.on('drop-text', (_e, text) => {
+      this.addSnippets([isWebLink(text) ? { kind: 'url', url: text.trim() } : { kind: 'text', text }]);
+      if (!this.shelf.visible) this.showShelf();
+    });
     this.refreshTrayMenu();
 
     this.store.onChange(() => this.onStoreChange());
