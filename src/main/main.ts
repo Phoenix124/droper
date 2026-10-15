@@ -21,6 +21,7 @@ import { pathToFileURL } from 'node:url';
 import { ClipboardHistory, type ClipContent, type ClipEntry } from '../core/clipboardHistory.js';
 import { contains, type Point } from '../core/dragDetector.js';
 import { shouldRemoveAfterDragOut } from '../core/dragOut.js';
+import { EmptyShelfIdle } from '../core/emptyShelf.js';
 import { saveSnippet, type SnippetPayload } from '../core/ingest.js';
 import { isWebLink, renameTarget } from '../core/fileNames.js';
 import { isIgnoredApp, type AppIdentity } from '../core/ignoredApps.js';
@@ -224,6 +225,22 @@ class Controller {
     setInterval(() => {
       if (this.shelf.visible) this.store.pruneMissing();
     }, 3000);
+    // Shelves shown by hand never see a drag end, so an empty one would otherwise stay forever.
+    const emptyIdle = new EmptyShelfIdle(3000);
+    setInterval(() => {
+      const bounds = this.shelf.bounds();
+      const hide = emptyIdle.tick(
+        {
+          visible: bounds !== null,
+          empty: this.store.items().length === 0,
+          autoHide: this.settings.get().autoHide,
+          dragging: this.watcher.isDragging,
+          hovered: bounds !== null && contains(bounds, screen.getCursorScreenPoint()),
+        },
+        Date.now(),
+      );
+      if (hide) this.shelf.hide();
+    }, 500);
     app.on('will-quit', () => {
       globalShortcut.unregisterAll();
       this.watcher.stop();
