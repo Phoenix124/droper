@@ -49,3 +49,29 @@ describe('JsonFile', () => {
     expect(f.read()).toEqual({ a: 1 });
   });
 });
+
+describe('appearance and ignore list settings', () => {
+  it('clamps shelf size and validates icon size', () => {
+    const s = normalizeSettings({ shelfWidth: 9999, shelfHeight: 10, iconSize: 'huge' });
+    expect(s.shelfWidth).toBe(260);
+    expect(s.shelfHeight).toBe(280);
+    expect(s.iconSize).toBe(DEFAULT_SETTINGS.iconSize);
+    expect(normalizeSettings({ shelfWidth: 180.6, iconSize: 'large' })).toMatchObject({ shelfWidth: 181, iconSize: 'large' });
+  });
+
+  it('cleans the ignore list', () => {
+    const s = normalizeSettings({ ignoredApps: [' com.apple.Finder ', '', 'com.apple.finder', 42, 'x'.repeat(300), 'explorer.exe'] });
+    expect(s.ignoredApps).toEqual(['com.apple.Finder', 'explorer.exe']);
+  });
+
+  it('does not report an unchanged ignore list as changed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'droper-'));
+    const store = new SettingsStore(new JsonFile(join(dir, 's.json')));
+    store.update({ ignoredApps: ['a'] });
+    const seen: string[][] = [];
+    store.onChange((k) => seen.push(k));
+    store.update({ ignoredApps: ['a'] });
+    expect(seen).toEqual([]);
+  });
+});
+

@@ -35,6 +35,20 @@ export interface SettingsView {
   launchAtLogin: boolean;
   clipboardHistory: boolean;
   clipboardLimit: number;
+  shelfWidth: number;
+  shelfHeight: number;
+  iconSize: 'small' | 'medium' | 'large';
+  ignoredApps: string[];
+}
+
+export interface AppView {
+  id: string;
+  name: string;
+  exe: string;
+}
+
+export interface ShelfAppearance {
+  iconSize: 'small' | 'medium' | 'large';
 }
 
 export interface DroperApi {
@@ -60,6 +74,7 @@ export interface DroperApi {
     previewFollow(ids: string[]): void;
     closePreview(): void;
     onPreviewState(cb: (open: boolean) => void): void;
+    onAppearance(cb: (appearance: ShelfAppearance) => void): void;
   };
   clipboard: {
     list(): Promise<ClipEntryView[]>;
@@ -75,6 +90,8 @@ export interface DroperApi {
     update(patch: Partial<SettingsView>): Promise<SettingsView>;
     accessibilityStatus(): Promise<boolean>;
     requestAccessibility(): void;
+    /** Apps that recently started drags, newest first, for quick-adding to the ignore list. */
+    recentSources(): Promise<AppView[]>;
   };
 }
 

@@ -10,7 +10,7 @@
             "CLANG_CXX_LANGUAGE_STANDARD": "c++17",
             "MACOSX_DEPLOYMENT_TARGET": "11.0"
           },
-          "link_settings": { "libraries": ["-framework AppKit"] }
+          "link_settings": { "libraries": ["-framework AppKit", "-framework CoreGraphics"] }
         }],
         ["OS=='win'", {
           "sources": ["src/drag_win.cc"],

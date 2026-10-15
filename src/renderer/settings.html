@@ -44,6 +44,36 @@
     <input id="hotkey" type="text" spellcheck="false">
   </div>
 
+  <h2>Appearance</h2>
+  <div class="row">
+    <label for="shelfWidth">Shelf width<span class="hint" id="shelfWidth-value"></span></label>
+    <input id="shelfWidth" type="range" min="100" max="260" step="4">
+  </div>
+  <div class="row">
+    <label for="shelfHeight">Shelf height<span class="hint" id="shelfHeight-value"></span></label>
+    <input id="shelfHeight" type="range" min="280" max="1000" step="10">
+  </div>
+  <div class="row">
+    <label for="iconSize">Icon size</label>
+    <select id="iconSize">
+      <option value="small">Small</option>
+      <option value="medium">Medium</option>
+      <option value="large">Large</option>
+    </select>
+  </div>
+
+  <h2>Ignored apps</h2>
+  <p class="hint block">Dragging from these apps won't bring up the shelf. Use a bundle id (<code>com.apple.finder</code>), an app name (<code>Finder</code>) or an exe (<code>explorer.exe</code>).</p>
+  <ul id="ignored" class="chips"></ul>
+  <div class="row add-row">
+    <input id="ignore-input" type="text" placeholder="App to ignore" spellcheck="false">
+    <button id="ignore-add" class="btn">Add</button>
+  </div>
+  <div id="recent-wrap" class="recent">
+    <span class="hint">Recent drag sources:</span>
+    <span id="recent"></span>
+  </div>
+
   <h2>Clipboard</h2>
   <div class="row">
     <label for="clipboardHistory">Record clipboard history<span class="hint">Turning it off deletes recorded history</span></label>

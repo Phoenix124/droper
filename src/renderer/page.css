@@ -48,3 +48,15 @@ input[type=checkbox][role=switch]:focus-visible { outline: 2px solid var(--accen
   input[type=checkbox][role=switch], input[type=checkbox][role=switch]::after { transition: none; }
 }
 #hotkey { width: 220px; }
+
+input[type=range] { width: 180px; accent-color: var(--accent); }
+.hint.block { display: block; margin: 0 0 8px; line-height: 1.4; }
+code { font: 11px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; background: var(--card); padding: 1px 4px; border-radius: 4px; }
+.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.chips li { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; border-radius: 12px; background: var(--card); border: 1px solid var(--border); }
+.chips li button { border: 0; background: transparent; cursor: pointer; color: var(--fg-muted); border-radius: 50%; width: 18px; height: 18px; line-height: 1; }
+.chips li button:hover { background: var(--border); color: var(--fg); }
+.chips:empty::before { content: 'No ignored apps'; color: var(--fg-muted); font-size: 12px; }
+.add-row input { flex: 1; }
+.recent { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.recent .btn { padding: 2px 8px; font-size: 12px; }

@@ -151,10 +151,53 @@ static napi_value StartDrag(napi_env env, napi_callback_info info) {
   return ok;
 }
 
+static void SetString(napi_env env, napi_value obj, const char* key, NSString* value) {
+  napi_value v;
+  napi_create_string_utf8(env, value ? value.UTF8String : "", NAPI_AUTO_LENGTH, &v);
+  napi_set_named_property(env, obj, key, v);
+}
+
+// appAtPoint(x, y): { id, name, exe } | null — owner of the frontmost normal window under a screen
+// point (Electron/CG coordinates, top-left origin). Uses only window bounds and owner PIDs, which
+// need no Screen Recording permission.
+static napi_value AppAtPoint(napi_env env, napi_callback_info info) {
+  size_t argc = 2;
+  napi_value argv[2];
+  napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
+  double x = 0, y = 0;
+  if (argc < 2 || napi_get_value_double(env, argv[0], &x) != napi_ok || napi_get_value_double(env, argv[1], &y) != napi_ok) {
+    return Throw(env, "appAtPoint(x, y) expects two numbers");
+  }
+  napi_value result;
+  napi_get_null(env, &result);
+  CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
+  if (!windows) return result;
+  pid_t ownPid = NSProcessInfo.processInfo.processIdentifier;
+  for (NSDictionary* w in (__bridge NSArray*)windows) {  // front to back
+    if ([w[(id)kCGWindowLayer] intValue] != 0) continue;
+    CGRect bounds;
+    if (!CGRectMakeWithDictionaryRepresentation((__bridge CFDictionaryRef)w[(id)kCGWindowBounds], &bounds)) continue;
+    if (!CGRectContainsPoint(bounds, CGPointMake(x, y))) continue;
+    pid_t pid = [w[(id)kCGWindowOwnerPID] intValue];
+    if (pid == ownPid) break;
+    NSRunningApplication* app = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+    if (!app) break;
+    napi_create_object(env, &result);
+    SetString(env, result, "id", app.bundleIdentifier);
+    SetString(env, result, "name", app.localizedName);
+    SetString(env, result, "exe", app.executableURL.lastPathComponent);
+    break;
+  }
+  CFRelease(windows);
+  return result;
+}
+
 static napi_value Init(napi_env env, napi_value exports) {
   napi_value fn;
   napi_create_function(env, "startDrag", NAPI_AUTO_LENGTH, StartDrag, nullptr, &fn);
   napi_set_named_property(env, exports, "startDrag", fn);
+  napi_create_function(env, "appAtPoint", NAPI_AUTO_LENGTH, AppAtPoint, nullptr, &fn);
+  napi_set_named_property(env, exports, "appAtPoint", fn);
   return exports;
 }
 

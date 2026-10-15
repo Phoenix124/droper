@@ -349,6 +349,11 @@ api.shelf.onPreviewState((open) => {
   previewOpen = open;
 });
 
+const THUMB_PX = { small: 48, medium: 72, large: 96 } as const;
+api.shelf.onAppearance(({ iconSize }) => {
+  document.documentElement.style.setProperty('--thumb', `${THUMB_PX[iconSize]}px`);
+});
+
 api.shelf.onItems((next) => {
   items = next;
   render();

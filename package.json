@@ -60,7 +60,15 @@
       "allowToChangeInstallationDirectory": true,
       "artifactName": "${productName}-Setup-${version}.${ext}"
     },
-    "npmRebuild": false
+    "npmRebuild": false,
+    "protocols": [
+      {
+        "name": "Droper",
+        "schemes": [
+          "droper"
+        ]
+      }
+    ]
   },
   "devDependencies": {
     "@types/node": "26.6.5",

@@ -1,6 +1,8 @@
-import { app } from 'electron';
+import { app, screen } from 'electron';
 import { join } from 'node:path';
+import type { Point } from '../core/dragDetector.js';
 import type { DragOperation } from '../core/dragOut.js';
+import type { AppIdentity } from '../core/ignoredApps.js';
 
 export interface NativeDragEnd {
   operation: DragOperation;
@@ -12,6 +14,8 @@ export interface NativeDragEnd {
 interface NativeDragAddon {
   /** On macOS onEnd fires later from the run loop; on Windows the call blocks and fires it before returning. */
   startDrag(handle: Buffer, paths: string[], onEnd: (end: NativeDragEnd) => void): boolean;
+  /** Takes points (macOS) or physical pixels (Windows). */
+  appAtPoint(x: number, y: number): AppIdentity | null;
 }
 
 let addon: NativeDragAddon | null | undefined;
@@ -28,4 +32,16 @@ export function nativeDrag(): NativeDragAddon | null {
     addon = null;
   }
   return addon;
+}
+
+/** App owning the window under a screen point (DIPs), or null if unknown. */
+export function appAtPoint(p: Point): AppIdentity | null {
+  const native = nativeDrag();
+  if (!native?.appAtPoint) return null;
+  const q = process.platform === 'win32' ? screen.dipToScreenPoint(p) : p;
+  try {
+    return native.appAtPoint(q.x, q.y);
+  } catch {
+    return null;
+  }
 }

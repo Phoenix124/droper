@@ -109,4 +109,13 @@ describe('DragDetector', () => {
     d.mouseMove({ x: 300, y: 0 });
     expect(shows).toEqual([]);
   });
+
+  it('passes the drag start point along with the show point', () => {
+    const starts: Array<{ x: number; y: number }> = [];
+    const { d } = setup({ onShow: (_p, start) => starts.push(start) });
+    d.mouseDown({ x: 5, y: 6 });
+    d.mouseMove({ x: 50, y: 6 });
+    expect(starts).toEqual([{ x: 5, y: 6 }]);
+  });
 });
+

@@ -8,7 +8,7 @@ const LEFT_BUTTON = 1;
 export interface DragWatcherHooks {
   mode: TriggerMode;
   shelfBounds: () => Rectangle | null;
-  onShow: (p: Point) => void;
+  onShow: (p: Point, start: Point) => void;
   onDragEnd: (p: Point, wasDragging: boolean) => void;
   /** Every left-button release, including drags that started on the shelf. */
   onMouseUp: (p: Point) => void;

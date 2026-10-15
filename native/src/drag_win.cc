@@ -131,10 +131,62 @@ static napi_value StartDrag(napi_env env, napi_callback_info info) {
   return ok;
 }
 
+static std::string WideToUtf8(const std::wstring& w) {
+  int n = WideCharToMultiByte(CP_UTF8, 0, w.c_str(), -1, nullptr, 0, nullptr, nullptr);
+  std::string s(n > 0 ? n - 1 : 0, '\0');
+  if (n > 1) WideCharToMultiByte(CP_UTF8, 0, w.c_str(), -1, s.data(), n, nullptr, nullptr);
+  return s;
+}
+
+static void SetString(napi_env env, napi_value obj, const char* key, const std::string& value) {
+  napi_value v;
+  napi_create_string_utf8(env, value.c_str(), NAPI_AUTO_LENGTH, &v);
+  napi_set_named_property(env, obj, key, v);
+}
+
+// appAtPoint(x, y): { id, name, exe } | null — process owning the top-level window under a
+// physical screen point.
+static napi_value AppAtPoint(napi_env env, napi_callback_info info) {
+  size_t argc = 2;
+  napi_value argv[2];
+  napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
+  double x = 0, y = 0;
+  if (argc < 2 || napi_get_value_double(env, argv[0], &x) != napi_ok || napi_get_value_double(env, argv[1], &y) != napi_ok) {
+    return Throw(env, "appAtPoint(x, y) expects two numbers");
+  }
+  napi_value result;
+  napi_get_null(env, &result);
+  POINT pt = {static_cast<LONG>(x), static_cast<LONG>(y)};
+  HWND hwnd = WindowFromPoint(pt);
+  if (!hwnd) return result;
+  hwnd = GetAncestor(hwnd, GA_ROOT);
+  DWORD pid = 0;
+  GetWindowThreadProcessId(hwnd, &pid);
+  if (!pid || pid == GetCurrentProcessId()) return result;
+  HANDLE proc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+  if (!proc) return result;
+  wchar_t buf[MAX_PATH * 2];
+  DWORD len = static_cast<DWORD>(sizeof(buf) / sizeof(buf[0]));
+  BOOL ok = QueryFullProcessImageNameW(proc, 0, buf, &len);
+  CloseHandle(proc);
+  if (!ok) return result;
+  std::wstring path(buf, len);
+  size_t slash = path.find_last_of(L"\\/");
+  std::string exe = WideToUtf8(slash == std::wstring::npos ? path : path.substr(slash + 1));
+  std::string name = exe.size() > 4 && _stricmp(exe.c_str() + exe.size() - 4, ".exe") == 0 ? exe.substr(0, exe.size() - 4) : exe;
+  napi_create_object(env, &result);
+  SetString(env, result, "id", "");
+  SetString(env, result, "name", name);
+  SetString(env, result, "exe", exe);
+  return result;
+}
+
 static napi_value Init(napi_env env, napi_value exports) {
   napi_value fn;
   napi_create_function(env, "startDrag", NAPI_AUTO_LENGTH, StartDrag, nullptr, &fn);
   napi_set_named_property(env, exports, "startDrag", fn);
+  napi_create_function(env, "appAtPoint", NAPI_AUTO_LENGTH, AppAtPoint, nullptr, &fn);
+  napi_set_named_property(env, exports, "appAtPoint", fn);
   return exports;
 }
 

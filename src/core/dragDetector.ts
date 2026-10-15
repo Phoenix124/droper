@@ -17,7 +17,8 @@ export interface DragDetectorOptions {
   /** Width of the screen-edge hot zone for `edge` mode. */
   edgeSize?: number;
   displayAt: (p: Point) => Rect;
-  onShow: (p: Point) => void;
+  /** `start` is where the button went down, i.e. where the dragged thing came from. */
+  onShow: (p: Point, start: Point) => void;
   onDragEnd?: (p: Point, wasDragging: boolean) => void;
   /** Drags starting inside this rect (the shelf itself) are ignored. */
   ignoreRect?: () => Rect | null;
@@ -72,7 +73,7 @@ export class DragDetector {
     if (this.mode === 'edge' && !this.atEdge(p)) return;
     if (this.opts.isRealDrag && !this.opts.isRealDrag()) return;
     this.shown = true;
-    this.opts.onShow({ ...p });
+    this.opts.onShow({ ...p }, { ...this.start });
   }
 
   mouseUp(p: Point): void {

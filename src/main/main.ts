@@ -14,21 +14,23 @@ import {
 } from 'electron';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, isAbsolute, join, sep } from 'node:path';
+import { basename, isAbsolute, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ClipboardHistory, type ClipContent, type ClipEntry } from '../core/clipboardHistory.js';
 import { contains, type Point } from '../core/dragDetector.js';
 import { shouldRemoveAfterDragOut } from '../core/dragOut.js';
 import { saveSnippet, type SnippetPayload } from '../core/ingest.js';
 import { isWebLink, renameTarget } from '../core/fileNames.js';
+import { isIgnoredApp, type AppIdentity } from '../core/ignoredApps.js';
 import { JsonFile } from '../core/jsonFile.js';
 import { latestOnly } from '../core/latest.js';
 import { SettingsStore, type Settings } from '../core/settings.js';
 import { ShelfStore, type ShelfItem, type ShelfState } from '../core/shelfStore.js';
+import { parseDroperUrl } from '../core/urlScheme.js';
 import type { ClipEntryView, ItemView } from '../shared/api';
 import { DragWatcher } from './dragWatcher.js';
 import { MacPasteboardWatcher } from './macPasteboard.js';
-import { nativeDrag, type NativeDragEnd } from './nativeDrag.js';
+import { appAtPoint, nativeDrag, type NativeDragEnd } from './nativeDrag.js';
 import {
   copyFiles,
   dragIconFor,
@@ -49,11 +51,31 @@ const isWin = process.platform === 'win32';
 const MAX_SNIPPET_BYTES = 200 * 1024 * 1024;
 
 const pendingPaths: string[] = [];
+const pendingUrls: string[] = [];
 let controller: Controller | null = null;
 
 function openPaths(paths: string[]): void {
   if (controller) controller.addExternalPaths(paths);
   else pendingPaths.push(...paths);
+}
+
+function openUrls(urls: string[]): void {
+  if (controller) urls.forEach((u) => controller!.handleUrl(u));
+  else pendingUrls.push(...urls);
+}
+
+/** droper:// links passed on the command line (Windows delivers protocol launches this way). */
+function urlsFromArgv(argv: string[]): string[] {
+  return argv.filter((a) => a.toLowerCase().startsWith('droper:'));
+}
+
+function registerProtocol(): void {
+  // In development the app is `electron .`, so Electron has to be told which script to launch.
+  if (process.defaultApp && process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('droper', process.execPath, [resolve(process.argv[1])]);
+  } else {
+    app.setAsDefaultProtocolClient('droper');
+  }
 }
 
 /** Absolute, existing file arguments (from "Send To", "Open With" or a second launch). */
@@ -66,13 +88,19 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', (_e, argv) => {
+    const urls = urlsFromArgv(argv);
     const paths = pathsFromArgv(argv);
+    if (urls.length) openUrls(urls);
     if (paths.length) openPaths(paths);
-    else controller?.toggleShelf();
+    if (!urls.length && !paths.length) controller?.toggleShelf();
   });
   app.on('open-file', (e, path) => {
     e.preventDefault();
     openPaths([path]);
+  });
+  app.on('open-url', (e, url) => {
+    e.preventDefault();
+    openUrls([url]);
   });
   // No window ever navigates away from its bundled page or opens new windows; a file dropped on a
   // settings window would otherwise load as a page that still has the preload API.
@@ -86,9 +114,12 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.whenReady().then(() => {
     if (isMac) app.dock?.hide();
+    registerProtocol();
     controller = new Controller();
     openPaths([...pendingPaths, ...pathsFromArgv(process.argv)]);
+    openUrls([...pendingUrls, ...urlsFromArgv(process.argv)]);
     pendingPaths.length = 0;
+    pendingUrls.length = 0;
   });
 }
 
@@ -114,6 +145,7 @@ class Controller {
   /** Bumped when history is turned off, so captures already in flight are dropped. */
   private clipSession = 0;
   private hookRunning = false;
+  private recentSources: AppIdentity[] = [];
 
   constructor() {
     mkdirSync(this.snippetsDir, { recursive: true });
@@ -141,7 +173,7 @@ class Controller {
       {
         mode: this.settings.get().trigger,
         shelfBounds: () => this.shelf.bounds(),
-        onShow: (p) => this.onDragShow(p),
+        onShow: (p, start) => this.onDragShow(p, start),
         onDragEnd: () => this.onDragEnd(),
         onMouseUp: (p) => this.onMouseUp(p),
       },
@@ -160,11 +192,14 @@ class Controller {
     this.settings.onChange((keys) => this.applySettings(keys));
 
     this.registerIpc();
-    this.applySettings(['hotkey', 'launchAtLogin', 'clipboardHistory']);
+    this.applySettings(['hotkey', 'launchAtLogin', 'clipboardHistory', 'shelfWidth']);
     this.startHookWhenPermitted();
     this.installSendTo();
 
-    this.shelf.win.webContents.once('did-finish-load', () => void this.broadcastItems());
+    this.shelf.win.webContents.once('did-finish-load', () => {
+      void this.broadcastItems();
+      this.sendAppearance();
+    });
     // The preview is anchored to the shelf, so it goes away when the shelf hides or is dragged elsewhere.
     this.shelf.win.on('hide', () => this.preview.hide());
     this.shelf.win.on('move', () => this.preview.hide());
@@ -190,8 +225,11 @@ class Controller {
     this.shelf.showAt(this.settings.get().side, screen.getCursorScreenPoint());
   }
 
-  private onDragShow(p: Point): void {
+  private onDragShow(p: Point, start: Point): void {
     const s = this.settings.get();
+    const source = appAtPoint(start);
+    if (source) this.rememberSource(source);
+    if (isIgnoredApp(source, s.ignoredApps)) return;
     const wasVisible = this.shelf.visible;
     this.shelf.showAt(s.side, p, s.trigger === 'atMouse');
     if (!wasVisible) this.shownByDrag = true;
@@ -250,6 +288,48 @@ class Controller {
     if (this.store.items().length === 0 && this.settings.get().autoHide && !this.watcher.isDragging) {
       this.shownByDrag = true;
       this.scheduleAutoHide();
+    }
+  }
+
+  /** Newest first, unique, for the "recent drag sources" quick-add buttons in settings. */
+  private rememberSource(app: AppIdentity): void {
+    const key = (a: AppIdentity) => (a.id || a.exe || a.name).toLowerCase();
+    this.recentSources = [app, ...this.recentSources.filter((a) => key(a) !== key(app))].slice(0, 8);
+  }
+
+  // ---- URL scheme ---------------------------------------------------------
+
+  handleUrl(raw: string): void {
+    const action = parseDroperUrl(raw);
+    if (!action) return;
+    switch (action.type) {
+      case 'show':
+        if (!this.shelf.visible) this.showShelf();
+        break;
+      case 'hide':
+        this.shelf.hide();
+        break;
+      case 'toggle':
+        this.toggleShelf();
+        break;
+      case 'clear':
+        this.store.clear();
+        break;
+      case 'restore':
+        this.store.restoreLastRemoved();
+        if (!this.shelf.visible) this.showShelf();
+        break;
+      case 'add':
+        this.addExternalPaths(action.paths);
+        break;
+      case 'addText':
+        this.addSnippets([{ kind: 'text', text: action.text }]);
+        if (!this.shelf.visible) this.showShelf();
+        break;
+      case 'addUrl':
+        this.addSnippets([{ kind: 'url', url: action.url, title: action.title }]);
+        if (!this.shelf.visible) this.showShelf();
+        break;
     }
   }
 
@@ -534,8 +614,17 @@ class Controller {
 
   // ---- settings, permissions, integration --------------------------------
 
+  private sendAppearance(): void {
+    this.shelf.send('shelf:appearance', { iconSize: this.settings.get().iconSize });
+  }
+
   private applySettings(keys: (keyof Settings)[]): void {
     const s = this.settings.get();
+    if (keys.includes('shelfWidth') || keys.includes('shelfHeight')) {
+      this.shelf.setSize(s.shelfWidth, s.shelfHeight);
+      this.preview.hide();
+    }
+    if (keys.includes('iconSize')) this.sendAppearance();
     if (keys.includes('trigger')) this.watcher.setMode(s.trigger);
     if (keys.includes('hotkey')) {
       globalShortcut.unregisterAll();
@@ -660,6 +749,7 @@ class Controller {
     this.handle('settings:update', (_e, patch) => (patch && typeof patch === 'object' ? this.settings.update(patch) : this.settings.get()));
     this.handle('settings:accessibility', () => !isMac || systemPreferences.isTrustedAccessibilityClient(false));
     this.on('settings:requestAccessibility', () => this.requestAccessibility());
+    this.handle('settings:recentSources', () => this.recentSources);
   }
 }
 

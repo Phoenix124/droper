@@ -22,6 +22,7 @@ const api: DroperApi = {
     previewFollow: (ids) => ipcRenderer.send('shelf:previewFollow', ids),
     closePreview: () => ipcRenderer.send('shelf:closePreview'),
     onPreviewState: (cb) => { ipcRenderer.on('shelf:previewState', (_e, open) => cb(open)); },
+    onAppearance: (cb) => { ipcRenderer.on('shelf:appearance', (_e, appearance) => cb(appearance)); },
   },
   clipboard: {
     list: () => ipcRenderer.invoke('clip:list'),
@@ -37,6 +38,7 @@ const api: DroperApi = {
     update: (patch) => ipcRenderer.invoke('settings:update', patch),
     accessibilityStatus: () => ipcRenderer.invoke('settings:accessibility'),
     requestAccessibility: () => ipcRenderer.send('settings:requestAccessibility'),
+    recentSources: () => ipcRenderer.invoke('settings:recentSources'),
   },
 };
 
