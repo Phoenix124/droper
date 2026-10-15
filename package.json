@@ -58,7 +58,8 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
+      "buildUniversalInstaller": false
     },
     "npmRebuild": false,
     "protocols": [
@@ -68,7 +69,12 @@
           "droper"
         ]
       }
-    ]
+    ],
+    "electronLanguages": [
+      "en",
+      "en-US"
+    ],
+    "compression": "maximum"
   },
   "devDependencies": {
     "@types/node": "26.6.5",

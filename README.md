@@ -117,7 +117,8 @@ Grab the latest build from [**Releases**](../../releases).
 | Platform | File | First launch |
 |---|---|---|
 | 🍎 macOS (Apple Silicon) | `Droper-<version>-arm64.dmg` | Unsigned: right-click → **Open**, then allow **Accessibility** when asked |
-| 🪟 Windows (x64 / ARM64) | `Droper-Setup-<version>.exe` | Unsigned: SmartScreen → **More info → Run anyway** |
+| 🪟 Windows (Intel / AMD) | `Droper-Setup-<version>-x64.exe` | Unsigned: SmartScreen → **More info → Run anyway** |
+| 🪟 Windows (ARM) | `Droper-Setup-<version>-arm64.exe` | Same as above |
 
 > [!NOTE]
 > Accessibility lets Droper see global mouse drags. Without it the shelf still works, but only through the shortcut or menu.
@@ -145,7 +146,7 @@ npm install       # also builds the native drag addon
 npm test          # core unit tests (vitest)
 npm start         # build + run
 npm run dist:mac  # release/Droper-<ver>-arm64.dmg
-npm run dist:win  # release/Droper-Setup-<ver>.exe (x64 + arm64)
+npm run dist:win  # release/Droper-Setup-<ver>-x64.exe and -arm64.exe
 ```
 
 Pushing a `v*` tag makes GitHub Actions build both platforms and attach them to a draft release.

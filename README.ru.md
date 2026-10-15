@@ -117,7 +117,8 @@
 | Платформа | Файл | Первый запуск |
 |---|---|---|
 | 🍎 macOS (Apple Silicon) | `Droper-<версия>-arm64.dmg` | Без подписи: правый клик → **Открыть**, затем разреши **Универсальный доступ** |
-| 🪟 Windows (x64 / ARM64) | `Droper-Setup-<версия>.exe` | Без подписи: SmartScreen → **Подробнее → Выполнить в любом случае** |
+| 🪟 Windows (Intel / AMD) | `Droper-Setup-<версия>-x64.exe` | Без подписи: SmartScreen → **Подробнее → Выполнить в любом случае** |
+| 🪟 Windows (ARM) | `Droper-Setup-<версия>-arm64.exe` | Так же |
 
 > [!NOTE]
 > Универсальный доступ нужен, чтобы Droper видел перетаскивание мышью. Без него шелф работает, но только по хоткею или из меню.
@@ -145,7 +146,7 @@ npm install       # заодно собирает нативный аддон
 npm test          # unit-тесты ядра (vitest)
 npm start         # сборка + запуск
 npm run dist:mac  # release/Droper-<ver>-arm64.dmg
-npm run dist:win  # release/Droper-Setup-<ver>.exe (x64 + arm64)
+npm run dist:win  # release/Droper-Setup-<ver>-x64.exe и -arm64.exe
 ```
 
 Тег `v*` запускает GitHub Actions: сборка под обе платформы и draft-релиз с инсталляторами.
