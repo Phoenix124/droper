@@ -53,6 +53,7 @@ import {
 import { PreviewWindow } from './previewWindow.js';
 import { ScreenshotWatcher } from './screenshotWatcher.js';
 import { ShelfWindow } from './shelfWindow.js';
+import { UpdateChecker } from './updateChecker.js';
 import { trayIcon } from './trayIcon.js';
 
 const isMac = process.platform === 'darwin';
@@ -172,6 +173,7 @@ class Controller {
   });
   private readonly preview = new PreviewWindow((open) => this.shelf.send('shelf:previewState', open));
   private readonly pasteboard: MacPasteboardWatcher | null;
+  private readonly updates = new UpdateChecker(new JsonFile(join(this.dataDir, 'updates.json')), () => this.refreshTrayMenu());
   private readonly screenshots = new ScreenshotWatcher((path) => this.addExternalPaths([path]));
   private readonly watcher: DragWatcher;
   private readonly tray: Tray;
@@ -238,7 +240,7 @@ class Controller {
     this.settings.onChange((keys) => this.applySettings(keys));
 
     this.registerIpc();
-    this.applySettings(['hotkey', 'launchAtLogin', 'clipboardHistory', 'shelfWidth', 'addScreenshots']);
+    this.applySettings(['hotkey', 'launchAtLogin', 'clipboardHistory', 'shelfWidth', 'addScreenshots', 'checkForUpdates']);
     this.startHookWhenPermitted();
     this.installSendTo();
 
@@ -278,6 +280,7 @@ class Controller {
       this.watcher.stop();
       this.pasteboard?.stop();
       this.screenshots.stop();
+      this.updates.stop();
     });
   }
 
@@ -579,6 +582,30 @@ class Controller {
     app.quit();
   }
 
+  private async checkForUpdatesNow(): Promise<void> {
+    let message: string;
+    let detail: string | undefined;
+    try {
+      const newer = await this.updates.check();
+      if (newer) {
+        const { response } = await dialog.showMessageBox({
+          message: `Droper ${newer.version} is available`,
+          detail: `You have ${app.getVersion()}.`,
+          buttons: ['Open Release Page', 'Later'],
+          defaultId: 0,
+          cancelId: 1,
+        });
+        if (response === 0) this.updates.openReleasePage();
+        return;
+      }
+      message = `Droper ${app.getVersion()} is the latest version`;
+    } catch (err) {
+      message = 'Could not check for updates';
+      detail = String((err as Error).message ?? err);
+    }
+    void dialog.showMessageBox({ message, detail });
+  }
+
   private setPositions(next: ShelfPositions): void {
     this.positions = next;
     if (this.positionsSave) clearTimeout(this.positionsSave);
@@ -692,7 +719,9 @@ class Controller {
 
   private trayTemplate(): MenuItemConstructorOptions[] {
     const s = this.settings.get();
+    const update = this.updates.available;
     const items: MenuItemConstructorOptions[] = [
+      ...(update ? [{ label: `Update Available: ${update.version}…`, click: () => this.updates.openReleasePage() }, { type: 'separator' as const }] : []),
       { label: this.shelf.visible ? 'Hide Shelf' : 'Show Shelf', accelerator: s.hotkey || undefined, click: () => this.toggleShelf() },
       { label: 'Add Clipboard to Shelf', click: () => void this.clipboardToShelf() },
       { label: 'Restore Removed Items', enabled: this.store.hasRemoved(), click: () => this.store.restoreLastRemoved() },
@@ -701,6 +730,7 @@ class Controller {
       { type: 'separator' },
       { label: 'Clipboard History…', click: () => this.openClipboardWindow() },
       { label: 'Settings…', click: () => this.openSettingsWindow() },
+      { label: 'Check for Updates…', click: () => void this.checkForUpdatesNow() },
     ];
     if (isMac && !systemPreferences.isTrustedAccessibilityClient(false)) {
       items.push({ type: 'separator' }, { label: '⚠︎ Allow Accessibility to detect drags…', click: () => this.requestAccessibility() });
@@ -915,6 +945,10 @@ class Controller {
         this.history.clear({ includePinned: true });
         this.cleanupClipImages();
       }
+    }
+    if (keys.includes('checkForUpdates')) {
+      if (s.checkForUpdates) this.updates.start();
+      else this.updates.stop();
     }
     if (keys.includes('addScreenshots')) {
       if (s.addScreenshots) void this.screenshots.start();

@@ -138,6 +138,10 @@ Droper isn't signed by Apple yet, so macOS blocks it the first time. Either:
 
 Only do this for builds downloaded from this repository's Releases, after checking them against `SHA256SUMS.txt`.
 
+### 🔄 Updates
+
+Once a day Droper asks GitHub for the latest release (a single request to `api.github.com`, nothing else is sent). When there is a newer version you get one notification and an **Update Available** item in the menu-bar menu that opens the release page; download and install it like the first time. **Check for Updates…** in the same menu checks right away, and **Settings → Check for updates** turns it off. Droper doesn't update itself: that needs a signed build.
+
 ### 🗑️ Uninstall
 
 - **macOS:** menu-bar icon → **Uninstall Droper…**. It removes the Accessibility permission, the login item and Droper's data (settings, shelf, clipboard history, kept copies), then moves the app to the Trash. Files you put on the shelf stay where they are.

@@ -18,6 +18,8 @@ export interface Settings {
   clipboardLimit: number;
   /** Put new screenshots on the shelf as they are saved. */
   addScreenshots: boolean;
+  /** Ask GitHub once a day whether a newer release exists. */
+  checkForUpdates: boolean;
   shelfWidth: number;
   shelfHeight: number;
   iconSize: IconSize;
@@ -40,6 +42,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   clipboardHistory: false,
   clipboardLimit: 50,
   addScreenshots: false,
+  checkForUpdates: true,
   shelfWidth: 132,
   shelfHeight: 460,
   iconSize: 'medium',
@@ -83,7 +86,7 @@ export function normalizeSettings(raw: unknown): Settings {
   const r = raw as Record<string, unknown>;
   if (TRIGGERS.includes(r.trigger as TriggerMode)) s.trigger = r.trigger as TriggerMode;
   if (SIDES.includes(r.side as ShelfSide)) s.side = r.side as ShelfSide;
-  for (const key of ['removeAfterDragOut', 'autoHide', 'launchAtLogin', 'clipboardHistory', 'confirmUrlActions', 'addScreenshots'] as const) {
+  for (const key of ['removeAfterDragOut', 'autoHide', 'launchAtLogin', 'clipboardHistory', 'confirmUrlActions', 'addScreenshots', 'checkForUpdates'] as const) {
     if (typeof r[key] === 'boolean') s[key] = r[key];
   }
   if (typeof r.hotkey === 'string') s.hotkey = r.hotkey;

@@ -36,6 +36,7 @@ export interface SettingsView {
   clipboardHistory: boolean;
   clipboardLimit: number;
   addScreenshots: boolean;
+  checkForUpdates: boolean;
   shelfWidth: number;
   shelfHeight: number;
   iconSize: 'small' | 'medium' | 'large';
