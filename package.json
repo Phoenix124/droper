@@ -1,7 +1,7 @@
 {
   "name": "droper",
   "productName": "Droper",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Cross-platform drag & drop shelf for macOS and Windows",
   "main": "dist/main/main.js",
   "private": true,
