@@ -30,7 +30,7 @@ export class MacPasteboardWatcher {
 
   start(): void {
     this.stopped = false;
-    const proc = spawn('osascript', ['-l', 'JavaScript', '-e', SCRIPT], { stdio: ['ignore', 'ignore', 'pipe'] });
+    const proc = spawn('/usr/bin/osascript', ['-l', 'JavaScript', '-e', SCRIPT], { stdio: ['ignore', 'ignore', 'pipe'] });
     this.proc = proc;
     createInterface({ input: proc.stderr! }).on('line', (line) => {
       const [d, g] = line.trim().split(' ').map(Number);

@@ -11,3 +11,12 @@ release/
 .DS_Store
 .beads/
 native/build/
+*.iml
+.env*
+*.tmp
+# Signing material
+*.p12
+*.pfx
+*.pem
+*.cer
+*.provisionprofile

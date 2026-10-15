@@ -3,6 +3,11 @@
   "productName": "Droper",
   "version": "0.3.3",
   "description": "Cross-platform drag & drop shelf for macOS and Windows",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Phoenix124/droper.git"
+  },
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {
@@ -74,7 +79,15 @@
       "en",
       "en-US"
     ],
-    "compression": "maximum"
+    "compression": "maximum",
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableCookieEncryption": true,
+      "onlyLoadAppFromAsar": true,
+      "enableEmbeddedAsarIntegrityValidation": true
+    }
   },
   "devDependencies": {
     "@types/node": "26.6.5",

@@ -113,6 +113,7 @@ static napi_value StartDrag(napi_env env, napi_callback_info info) {
   NSMutableArray<NSDraggingItem*>* items = [NSMutableArray array];
   for (size_t i = 0; i < paths.size(); i++) {
     NSString* path = [NSString stringWithUTF8String:paths[i].c_str()];
+    if (path == nil) continue;  // invalid UTF-8; fileURLWithPath:nil would throw
     NSURL* url = [NSURL fileURLWithPath:path];
     NSDraggingItem* item = [[NSDraggingItem alloc] initWithPasteboardWriter:url];
     NSImage* icon = [[NSWorkspace sharedWorkspace] iconForFile:path];
@@ -135,6 +136,10 @@ static napi_value StartDrag(napi_env env, napi_callback_info info) {
                                pressure:1.0];
   }
 
+  if (items.count == 0) {
+    napi_release_threadsafe_function(tsfn, napi_tsfn_abort);
+    return Throw(env, "no valid paths");
+  }
   if (gActiveSources == nil) gActiveSources = [NSMutableSet set];
   [gActiveSources addObject:source];
   NSDraggingSession* session = [view beginDraggingSessionWithItems:items event:event source:source];

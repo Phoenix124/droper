@@ -2,6 +2,7 @@ import { app, clipboard, ClipboardItem, nativeImage, type NativeImage } from 'el
 import { statSync } from 'node:fs';
 import { extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isPrivateClipboard } from '../core/clipboardFilter.js';
 import { LruCache } from '../core/lruCache.js';
 
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.heic', '.ico']);
@@ -97,8 +98,11 @@ export type ClipboardSnapshot =
   | { kind: 'image'; png: Buffer }
   | { kind: 'text'; text: string };
 
-/** Reads the most useful representation currently on the system clipboard. */
-export async function readClipboard(): Promise<ClipboardSnapshot | null> {
+/**
+ * Reads the most useful representation currently on the system clipboard. With `skipPrivate`,
+ * content that password managers mark as concealed/transient (or excluded from history) is ignored.
+ */
+export async function readClipboard({ skipPrivate = false } = {}): Promise<ClipboardSnapshot | null> {
   let items: Electron.ClipboardItem[];
   try {
     items = await clipboard.read();
@@ -107,6 +111,7 @@ export async function readClipboard(): Promise<ClipboardSnapshot | null> {
   }
   const item = items[0];
   if (!item) return null;
+  if (skipPrivate && isPrivateClipboard(item.types)) return null;
   const text = async (type: string) => {
     const v = await item.getType(type);
     return v instanceof Blob ? v.text() : '';

@@ -6,6 +6,7 @@ import {
   ipcMain,
   Menu,
   screen,
+  session,
   shell,
   systemPreferences,
   Tray,
@@ -107,6 +108,12 @@ if (!app.requestSingleInstanceLock()) {
   // settings window would otherwise load as a page that still has the preload API.
   app.on('web-contents-created', (_e, contents) => {
     contents.on('will-navigate', (ev) => ev.preventDefault());
+    // Sub-frames exist only for the PDF preview: allow the PDF itself and Chromium's built-in viewer.
+    contents.on('will-frame-navigate', (ev) => {
+      if (ev.isMainFrame) return;
+      const pdf = ev.url.startsWith('file:') && /\.pdf$/i.test(new URL(ev.url).pathname);
+      if (!pdf && !ev.url.startsWith('chrome-extension:')) ev.preventDefault();
+    });
     contents.on('will-redirect', (ev) => ev.preventDefault());
     contents.setWindowOpenHandler(() => ({ action: 'deny' }));
   });
@@ -115,6 +122,9 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.whenReady().then(() => {
     if (isMac) app.dock?.hide();
+    // No page needs camera, notifications, clipboard-read etc.; deny every permission request.
+    session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+    session.defaultSession.setPermissionCheckHandler(() => false);
     registerProtocol();
     controller = new Controller();
     openPaths([...pendingPaths, ...pathsFromArgv(process.argv)]);
@@ -147,6 +157,7 @@ class Controller {
   private clipSession = 0;
   private hookRunning = false;
   private recentSources: AppIdentity[] = [];
+  private urlSnippetTimes: number[] = [];
 
   constructor() {
     mkdirSync(this.snippetsDir, { recursive: true });
@@ -339,32 +350,40 @@ class Controller {
         this.addExternalPaths(action.paths);
         break;
       case 'addText':
+        if (!this.allowUrlSnippet()) return;
         this.addSnippets([{ kind: 'text', text: action.text }]);
         if (!this.shelf.visible) this.showShelf();
         break;
       case 'addUrl':
+        if (!this.allowUrlSnippet()) return;
         this.addSnippets([{ kind: 'url', url: action.url, title: action.title }]);
         if (!this.shelf.visible) this.showShelf();
         break;
     }
   }
 
+  /** Links can be fired repeatedly by a web page; cap how many snippet files they may create. */
+  private allowUrlSnippet(): boolean {
+    const now = Date.now();
+    this.urlSnippetTimes = this.urlSnippetTimes.filter((t) => now - t < 60_000);
+    if (this.urlSnippetTimes.length >= 10) return false;
+    this.urlSnippetTimes.push(now);
+    return true;
+  }
+
   private async confirmUrlAction(action: UrlAction): Promise<boolean> {
     // The parser caps links at MAX_URL_PATHS and rejects control/bidi characters, so every path is shown verbatim.
     const shown = action.type === 'add' ? action.paths.join('\n') : '';
     if (isMac) app.focus({ steal: true });
-    const { response, checkboxChecked } = await dialog.showMessageBox({
+    const { response } = await dialog.showMessageBox({
       type: 'question',
       buttons: [action.type === 'add' ? 'Add to Shelf' : 'Clear Shelf', 'Cancel'],
       defaultId: 1,
       cancelId: 1,
       message: action.type === 'add' ? 'A droper:// link wants to add files to your shelf' : 'A droper:// link wants to clear your shelf',
       detail: action.type === 'add' ? `${shown}\n\nOnly continue if you started this yourself.` : 'Only continue if you started this yourself.',
-      checkboxLabel: "Don't ask again for droper:// links",
     });
-    if (response !== 0) return false;
-    if (checkboxChecked) this.settings.update({ confirmUrlActions: false });
-    return true;
+    return response === 0;
   }
 
   // ---- shelf content ----------------------------------------------------
@@ -517,7 +536,8 @@ class Controller {
   // ---- clipboard history -------------------------------------------------
 
   private async snapshotToContent(): Promise<ClipContent | null> {
-    const snap = await readClipboard();
+    // History never records what password managers mark as secret.
+    const snap = await readClipboard({ skipPrivate: true });
     if (!snap) return null;
     if (snap.kind !== 'image') return snap;
     const signature = createHash('sha1').update(snap.png).digest('hex');

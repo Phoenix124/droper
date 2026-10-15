@@ -64,5 +64,16 @@ describe('parseDroperUrl', () => {
     const ok = Array.from({ length: 20 }, (_, i) => `path=/tmp/f${i}`).join('&');
     expect(parseDroperUrl(`droper://add?${ok}`)).toMatchObject({ type: 'add' });
   });
+
+  it('refuses macOS automount paths that would contact a remote host before the user agrees', () => {
+    for (const p of ['/net/evil/x', '/Network/Servers/evil/x', '/NET/evil/x']) {
+      expect(parseDroperUrl(`droper://add?path=${encodeURIComponent(p)}`)).toBeNull();
+    }
+  });
+
+  it('drops link titles that look like file names, so a link cannot pose as a document', () => {
+    expect(parseDroperUrl('droper://add-url?url=https%3A%2F%2Fevil.example&title=Invoice.pdf')).toEqual({ type: 'addUrl', url: 'https://evil.example' });
+    expect(parseDroperUrl('droper://add-url?url=https%3A%2F%2Fa.com&title=Docs')).toEqual({ type: 'addUrl', url: 'https://a.com', title: 'Docs' });
+  });
 });
 

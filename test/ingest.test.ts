@@ -84,4 +84,11 @@ describe('saveSnippet', () => {
     const p = saveSnippet(dir, { kind: 'image', data: new Uint8Array([0]), mime: 'application/x-msdownload', fileName: 'a' }, 'win32');
     expect(basename(p)).toBe('a.png');
   });
+
+  it('never names a snippet after a reserved Windows device', () => {
+    for (const name of ['CON', 'nul', 'COM1', 'lpt9', 'Aux']) {
+      expect(basename(saveSnippet(dir, { kind: 'text', text: name }, 'win32'))).toBe(`_${name}.txt`);
+    }
+  });
 });
+

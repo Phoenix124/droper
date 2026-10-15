@@ -22,10 +22,14 @@ const IMAGE_EXT: Record<string, string> = {
   'image/heic': '.heic',
 };
 
+// Windows treats these names as devices regardless of extension (CON.txt opens the console).
+const RESERVED_WINDOWS_NAMES = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/i;
+
 export function snippetTitle(text: string, fallback = 'Text'): string {
   const line = text.split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? '';
   const clean = line.replace(ILLEGAL_FILENAME_CHARS, ' ').replace(/\s+/g, ' ').trim().slice(0, MAX_TITLE).trim();
-  return clean || fallback;
+  const title = clean || fallback;
+  return RESERVED_WINDOWS_NAMES.test(title) ? `_${title}` : title;
 }
 
 const ALLOWED_IMAGE_EXT = new Set([...Object.values(IMAGE_EXT), '.jpeg', '.tif']);

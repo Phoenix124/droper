@@ -33,6 +33,10 @@ static HGLOBAL MakeHDrop(const std::vector<std::wstring>& paths) {
   HGLOBAL mem = GlobalAlloc(GHND, sizeof(DROPFILES) + chars * sizeof(wchar_t));
   if (!mem) return nullptr;
   auto* df = static_cast<DROPFILES*>(GlobalLock(mem));
+  if (!df) {
+    GlobalFree(mem);
+    return nullptr;
+  }
   df->pFiles = sizeof(DROPFILES);
   df->fWide = TRUE;
   auto* dst = reinterpret_cast<wchar_t*>(reinterpret_cast<BYTE*>(df) + sizeof(DROPFILES));
@@ -93,7 +97,12 @@ static napi_value StartDrag(napi_env env, napi_callback_info info) {
     paths.push_back(Utf8ToWide(path));
   }
 
-  OleInitialize(nullptr);  // already initialized on Electron's UI thread; harmless S_FALSE then
+  // Electron's UI thread already has OLE (S_FALSE); balance whatever this call added.
+  HRESULT ole = OleInitialize(nullptr);
+  if (FAILED(ole)) return Throw(env, "OleInitialize failed");
+  struct OleGuard {
+    ~OleGuard() { OleUninitialize(); }
+  } oleGuard;
   IDataObject* data = nullptr;
   if (FAILED(SHCreateDataObject(nullptr, 0, nullptr, nullptr, IID_PPV_ARGS(&data)))) return Throw(env, "SHCreateDataObject failed");
 
