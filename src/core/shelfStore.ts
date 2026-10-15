@@ -99,13 +99,23 @@ export class ShelfStore {
     return this.remove(this.state.items.map((i) => i.id), { force: includeLocked });
   }
 
+  /** Puts the last removed batch back, leaving out paths that were added to the shelf again meanwhile. */
   restoreLastRemoved(): ShelfItem[] {
-    const restored = this.state.lastRemoved;
-    if (!restored.length) return [];
+    const batch = this.state.lastRemoved;
+    if (!batch.length) return [];
     this.state.lastRemoved = [];
+    const known = new Set(this.state.items.flatMap((i) => i.paths));
+    const restored: ShelfItem[] = [];
+    for (const item of batch) {
+      const fresh = item.paths.filter((p) => !known.has(p));
+      if (!fresh.length) continue;
+      fresh.forEach((p) => known.add(p));
+      if (fresh.length !== item.paths.length) this.setPaths(item, fresh);
+      restored.push(item);
+    }
     this.state.items.push(...restored);
     this.commit();
-    return restored;
+    return restored.map((i) => ({ ...i, paths: [...i.paths] }));
   }
 
   setLocked(ids: string[], locked: boolean): void {
@@ -190,13 +200,7 @@ export class ShelfStore {
         pruned.push(item);
         continue;
       }
-      item.paths = alive;
-      if (alive.length === 1) {
-        item.kind = 'file';
-        item.name = baseName(alive[0]);
-      } else {
-        item.name = stackName(alive);
-      }
+      this.setPaths(item, alive);
       kept.push(item);
     }
     if (changed) {
@@ -204,6 +208,17 @@ export class ShelfStore {
       this.commit();
     }
     return pruned;
+  }
+
+  /** Replaces a stack's paths, collapsing it to a plain file item when one path is left. */
+  private setPaths(item: ShelfItem, paths: string[]): void {
+    item.paths = paths;
+    if (paths.length === 1) {
+      item.kind = 'file';
+      item.name = baseName(paths[0]);
+    } else {
+      item.name = stackName(paths);
+    }
   }
 
   private makeItem(kind: ShelfItemKind, paths: string[], snippet: boolean): ShelfItem {

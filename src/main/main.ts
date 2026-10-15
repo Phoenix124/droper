@@ -14,12 +14,14 @@ import {
 } from 'electron';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, dirname, isAbsolute, join, sep } from 'node:path';
+import { basename, isAbsolute, join, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ClipboardHistory, type ClipContent, type ClipEntry } from '../core/clipboardHistory.js';
 import { contains, type Point } from '../core/dragDetector.js';
 import { saveSnippet, type SnippetPayload } from '../core/ingest.js';
+import { isWebLink, renameTarget } from '../core/fileNames.js';
 import { JsonFile } from '../core/jsonFile.js';
+import { latestOnly } from '../core/latest.js';
 import { SettingsStore, type Settings } from '../core/settings.js';
 import { ShelfStore, type ShelfItem, type ShelfState } from '../core/shelfStore.js';
 import type { ClipEntryView, ItemView } from '../shared/api';
@@ -33,6 +35,7 @@ import {
   quickLook,
   readClipboard,
   thumbnailFor,
+  type ClipboardSnapshot,
   writeClipboardImage,
   writeClipboardText,
 } from './platform.js';
@@ -105,6 +108,8 @@ class Controller {
   private latestClip: ClipContent | null = null;
   private clipTimer: NodeJS.Timeout | null = null;
   private captureChain: Promise<void> = Promise.resolve();
+  /** Bumped when history is turned off, so captures already in flight are dropped. */
+  private clipSession = 0;
   private hookRunning = false;
 
   constructor() {
@@ -122,6 +127,7 @@ class Controller {
       read: () => this.latestClip,
       limit: this.settings.get().clipboardLimit,
       persistence: { load: () => clipFile.read(), save: (s) => clipFile.write(s) },
+      onDiscard: (entry) => this.discardClipImage(entry),
     });
     this.cleanupClipImages();
 
@@ -234,10 +240,11 @@ class Controller {
     this.store.addPaths(paths, { snippet: true });
   }
 
+  /** Files inside Snippets/ belong to Droper whatever item (or stack) they ended up in. */
   private discardSnippetFiles(item: ShelfItem): void {
-    if (!item.snippet) return;
+    const inUse = new Set(this.store.items().flatMap((i) => i.paths));
     for (const p of item.paths) {
-      if (p.startsWith(this.snippetsDir + sep)) rmSync(p, { force: true, recursive: true });
+      if (p.startsWith(this.snippetsDir + sep) && !inUse.has(p)) rmSync(p, { force: true, recursive: true });
     }
   }
 
@@ -259,19 +266,20 @@ class Controller {
     );
   }
 
-  private async broadcastItems(): Promise<void> {
-    this.shelf.send('shelf:items', await this.itemViews());
-  }
+  /** Thumbnails load asynchronously; only the newest list may reach the renderer. */
+  private readonly broadcastItems = latestOnly(
+    () => this.itemViews(),
+    (views) => this.shelf.send('shelf:items', views),
+  );
 
   private renameItem(id: string, rawName: string): string | null {
-    const name = rawName.trim();
-    if (!name || name === '.' || name === '..' || /[\\/:*?"<>|\u0000-\u001f]/.test(name)) return null;
     const item = this.store.items().find((i) => i.id === id);
     if (!item || item.kind !== 'file') return null;
     const from = item.paths[0];
-    const to = join(dirname(from), name);
+    const to = renameTarget(from, rawName, existsSync);
+    if (!to) return null;
+    const name = basename(to);
     if (to === from) return name;
-    if (existsSync(to)) return null;
     try {
       renameSync(from, to);
     } catch {
@@ -348,8 +356,11 @@ class Controller {
   /** Captures run one at a time so a slow read can't land after a newer one. */
   private captureClipboard(): Promise<void> {
     this.captureChain = this.captureChain.then(async () => {
+      const session = this.clipSession;
       if (!this.settings.get().clipboardHistory) return;
-      this.latestClip = await this.snapshotToContent();
+      const content = await this.snapshotToContent();
+      if (session !== this.clipSession || !this.settings.get().clipboardHistory) return;
+      this.latestClip = content;
       this.history.poll();
     }).catch((err) => console.error('Clipboard capture failed', err));
     return this.captureChain;
@@ -363,8 +374,15 @@ class Controller {
   }
 
   private stopClipboardHistory(): void {
+    this.clipSession++;
     if (this.clipTimer) clearInterval(this.clipTimer);
     this.clipTimer = null;
+  }
+
+  private discardClipImage(entry: ClipEntry): void {
+    const path = entry.imagePath;
+    if (!path || !path.startsWith(this.clipImagesDir + sep)) return;
+    if (!this.history.entries().some((e) => e.imagePath === path)) rmSync(path, { force: true });
   }
 
   private cleanupClipImages(): void {
@@ -385,9 +403,12 @@ class Controller {
     );
   }
 
-  private async broadcastClips(): Promise<void> {
-    if (this.clipWin && !this.clipWin.isDestroyed()) this.clipWin.webContents.send('clip:entries', await this.clipViews());
-  }
+  private readonly broadcastClips = latestOnly(
+    () => this.clipViews(),
+    (views) => {
+      if (this.clipWin && !this.clipWin.isDestroyed()) this.clipWin.webContents.send('clip:entries', views);
+    },
+  );
 
   private async copyClip(id: string): Promise<void> {
     const e = this.history.entries().find((x) => x.id === id);
@@ -400,21 +421,22 @@ class Controller {
   private clipToShelf(id: string): void {
     const e = this.history.entries().find((x) => x.id === id);
     if (!e) return;
-    if (e.kind === 'files' && e.files) this.addExternalPaths(e.files);
-    else if (e.kind === 'image' && e.imagePath && existsSync(e.imagePath)) {
-      this.addSnippets([{ kind: 'image', data: readFileSync(e.imagePath), mime: 'image/png' }]);
-    } else if (e.kind === 'link' && e.text) this.addSnippets([{ kind: 'url', url: e.text.trim() }]);
-    else if (e.text) this.addSnippets([{ kind: 'text', text: e.text }]);
-    if (!this.shelf.visible) this.showShelf();
+    if (e.kind === 'files' && e.files) this.contentToShelf({ kind: 'files', files: e.files });
+    else if (e.kind === 'image' && e.imagePath && existsSync(e.imagePath)) this.contentToShelf({ kind: 'image', png: readFileSync(e.imagePath) });
+    else if (e.text !== undefined) this.contentToShelf({ kind: 'text', text: e.text });
   }
 
   private async clipboardToShelf(): Promise<void> {
     const snap = await readClipboard();
-    if (!snap) return;
-    if (snap.kind === 'files') this.addExternalPaths(snap.files);
-    else if (snap.kind === 'image') this.addSnippets([{ kind: 'image', data: snap.png, mime: 'image/png' }]);
-    else if (/^https?:\/\/\S+$/i.test(snap.text.trim())) this.addSnippets([{ kind: 'url', url: snap.text.trim() }]);
-    else if (snap.text.trim()) this.addSnippets([{ kind: 'text', text: snap.text }]);
+    if (snap) this.contentToShelf(snap);
+  }
+
+  /** Single place that turns clipboard content into shelf items. */
+  private contentToShelf(content: ClipboardSnapshot): void {
+    if (content.kind === 'files') this.addExternalPaths(content.files);
+    else if (content.kind === 'image') this.addSnippets([{ kind: 'image', data: content.png, mime: 'image/png' }]);
+    else if (isWebLink(content.text)) this.addSnippets([{ kind: 'url', url: content.text.trim() }]);
+    else if (content.text.trim()) this.addSnippets([{ kind: 'text', text: content.text }]);
     if (!this.shelf.visible) this.showShelf();
   }
 

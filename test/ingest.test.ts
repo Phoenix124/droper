@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, basename } from 'node:path';
-import { saveSnippet, snippetTitle, uniquePath } from '../src/core/ingest';
+import { saveSnippet, snippetTitle } from '../src/core/ingest';
 
 describe('snippetTitle', () => {
   it('uses the first line, trimmed and shortened', () => {
@@ -16,16 +16,6 @@ describe('snippetTitle', () => {
 
   it('falls back to Text for blank input', () => {
     expect(snippetTitle('   \n ')).toBe('Text');
-  });
-});
-
-describe('uniquePath', () => {
-  it('appends a counter when the file exists', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'droper-'));
-    writeFileSync(join(dir, 'a.txt'), '');
-    writeFileSync(join(dir, 'a 2.txt'), '');
-    expect(uniquePath(dir, 'a', '.txt')).toBe(join(dir, 'a 3.txt'));
-    expect(uniquePath(dir, 'b', '.txt')).toBe(join(dir, 'b.txt'));
   });
 });
 

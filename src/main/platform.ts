@@ -1,16 +1,29 @@
 import { app, BrowserWindow, clipboard, ClipboardItem, nativeImage, shell, type NativeImage } from 'electron';
 import { spawn } from 'node:child_process';
+import { statSync } from 'node:fs';
 import { extname } from 'node:path';
+import { LruCache } from '../core/lruCache.js';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.heic', '.ico']);
 const PREVIEWABLE_EXTS = new Set([...IMAGE_EXTS, '.pdf', '.txt', '.md', '.json', '.svg', '.mp4', '.webm', '.mp3', '.wav']);
 
-const thumbCache = new Map<string, NativeImage>();
+// Keyed by path + mtime + size so a file rewritten in place (or a reused snippet name) gets a fresh thumbnail.
+const thumbCache = new LruCache<string, NativeImage>(300);
+
+function thumbKey(path: string): string {
+  try {
+    const st = statSync(path);
+    return `${path}|${st.mtimeMs}|${st.size}`;
+  } catch {
+    return `${path}|missing`;
+  }
+}
 
 /** Thumbnail for images (and on macOS for most documents via Quick Look), file icon otherwise. */
 export async function thumbnailFor(path: string): Promise<NativeImage | null> {
-  const cached = thumbCache.get(path);
+  const key = thumbKey(path);
+  const cached = thumbCache.get(key);
   if (cached) return cached;
   let img: NativeImage | null = null;
   try {
@@ -25,17 +38,20 @@ export async function thumbnailFor(path: string): Promise<NativeImage | null> {
       img = null;
     }
   }
-  if (img && !img.isEmpty()) thumbCache.set(path, img);
+  if (img && !img.isEmpty()) {
+    forgetThumbnail(path);
+    thumbCache.set(key, img);
+  }
   return img;
 }
 
 export function forgetThumbnail(path: string): void {
-  thumbCache.delete(path);
+  thumbCache.deleteWhere((k) => k.startsWith(`${path}|`));
 }
 
 /** Synchronous icon for startDrag, which needs one immediately. */
 export function dragIconFor(paths: string[]): NativeImage {
-  const thumb = thumbCache.get(paths[0]);
+  const thumb = thumbCache.get(thumbKey(paths[0]));
   if (thumb) return thumb.resize({ width: 64, height: 64 });
   return placeholderIcon();
 }
@@ -125,6 +141,15 @@ export async function readClipboard(): Promise<ClipboardSnapshot | null> {
     return v instanceof Blob ? v.text() : '';
   };
   try {
+    // Only text/uri-list carries every copied file (built from CF_HDROP on Windows); the raw
+    // NSFilenamesPboardType / FileNameW formats hold just the first one and are fallbacks.
+    if (item.types.includes('text/uri-list')) {
+      const files = (await text('text/uri-list'))
+        .split(/\r?\n/)
+        .filter((l) => l.startsWith('file://'))
+        .map((l) => fileURLToPath(l.trim()));
+      if (files.length) return { kind: 'files', files };
+    }
     if (item.types.includes(MAC_FILES)) {
       const files = [...(await text(MAC_FILES)).matchAll(/<string>([^<]*)<\/string>/g)].map((m) => plistUnescape(m[1]));
       if (files.length) return { kind: 'files', files };
@@ -133,13 +158,6 @@ export async function readClipboard(): Promise<ClipboardSnapshot | null> {
       const blob = await item.getType(WIN_FILE);
       const path = blob instanceof Blob ? Buffer.from(await blob.arrayBuffer()).toString('ucs2').replace(/\0+$/, '') : '';
       if (path) return { kind: 'files', files: [path] };
-    }
-    if (item.types.includes('text/uri-list')) {
-      const files = (await text('text/uri-list'))
-        .split(/\r?\n/)
-        .filter((l) => l.startsWith('file://'))
-        .map((l) => fileURLToPath(l.trim()));
-      if (files.length) return { kind: 'files', files };
     }
     if (item.types.includes('image/png')) {
       const blob = await item.getType('image/png');

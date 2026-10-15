@@ -1,12 +1,12 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { ILLEGAL_FILENAME_CHARS } from './fileNames.js';
 
 export type SnippetPayload =
   | { kind: 'text'; text: string }
   | { kind: 'url'; url: string; title?: string }
   | { kind: 'image'; data: Uint8Array; mime: string; fileName?: string };
 
-const ILLEGAL = /[\\/:*?"<>|\u0000-\u001f]+/g;
 const MAX_TITLE = 40;
 
 const SHORTCUT_PROTOCOLS = new Set(['http:', 'https:', 'ftp:', 'mailto:']);
@@ -24,17 +24,11 @@ const IMAGE_EXT: Record<string, string> = {
 
 export function snippetTitle(text: string, fallback = 'Text'): string {
   const line = text.split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? '';
-  const clean = line.replace(ILLEGAL, ' ').replace(/\s+/g, ' ').trim().slice(0, MAX_TITLE).trim();
+  const clean = line.replace(ILLEGAL_FILENAME_CHARS, ' ').replace(/\s+/g, ' ').trim().slice(0, MAX_TITLE).trim();
   return clean || fallback;
 }
 
 const ALLOWED_IMAGE_EXT = new Set([...Object.values(IMAGE_EXT), '.jpeg', '.tif']);
-
-export function uniquePath(dir: string, stem: string, ext: string): string {
-  let candidate = join(dir, `${stem}${ext}`);
-  for (let n = 2; existsSync(candidate); n++) candidate = join(dir, `${stem} ${n}${ext}`);
-  return candidate;
-}
 
 /** Creates the file exclusively ('wx'), bumping the counter on collisions, so nothing is ever overwritten. */
 function writeUnique(dir: string, stem: string, ext: string, data: string | Uint8Array): string {

@@ -168,4 +168,23 @@ describe('ShelfStore', () => {
     store.move([c.id], 0);
     expect(store.items().map((i) => i.id)).toEqual([c.id, a.id, b.id]);
   });
+
+  it('restoring skips paths that were re-added in the meantime', () => {
+    const [a, b] = store.addPaths(['/a/one.txt', '/a/two.png']);
+    store.remove([a.id, b.id]);
+    store.addPaths(['/a/one.txt']);
+    const restored = store.restoreLastRemoved();
+    expect(restored.map((i) => i.paths[0])).toEqual(['/a/two.png']);
+    expect(store.items().flatMap((i) => i.paths).sort()).toEqual(['/a/one.txt', '/a/two.png']);
+  });
+
+  it('restoring a stack drops duplicate paths and collapses to a file', () => {
+    const [a, b] = store.addPaths(['/a/one.txt', '/a/two.png']);
+    const s = store.mergeToStack([a.id, b.id])!;
+    store.remove([s.id]);
+    store.addPaths(['/a/one.txt']);
+    const [restored] = store.restoreLastRemoved();
+    expect(restored).toMatchObject({ kind: 'file', paths: ['/a/two.png'], name: 'two.png' });
+  });
 });
+

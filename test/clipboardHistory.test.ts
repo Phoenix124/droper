@@ -90,4 +90,18 @@ describe('ClipboardHistory', () => {
     fresh.prime();
     expect(fresh.poll()).toBeNull();
   });
+
+  it('reports entries it drops so their image files can be deleted', () => {
+    const dropped: string[] = [];
+    const hist = new ClipboardHistory({ read: () => current, limit: 1, idGen: () => `d${++n}`, onDiscard: (e) => dropped.push(e.preview) });
+    current = { kind: 'text', text: 'a' }; hist.poll();
+    current = { kind: 'text', text: 'b' }; hist.poll();
+    expect(dropped).toEqual(['a']);
+    hist.remove(hist.entries()[0].id);
+    expect(dropped).toEqual(['a', 'b']);
+    current = { kind: 'text', text: 'c' }; hist.poll();
+    hist.clear({ includePinned: true });
+    expect(dropped).toEqual(['a', 'b', 'c']);
+  });
 });
+

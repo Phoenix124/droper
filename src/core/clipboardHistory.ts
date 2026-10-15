@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { isWebLink } from './fileNames.js';
 import { baseName } from './shelfStore.js';
 
 export type ClipContent =
@@ -30,9 +31,9 @@ export interface ClipboardHistoryOptions {
   persistence?: { load(): ClipState | null; save(state: ClipState): void };
   idGen?: () => string;
   now?: () => number;
+  /** Called for every entry that leaves the history (removed, cleared or trimmed). */
+  onDiscard?: (entry: ClipEntry) => void;
 }
-
-const LINK = /^https?:\/\/\S+$/i;
 
 function signatureOf(c: ClipContent): string {
   switch (c.kind) {
@@ -104,14 +105,19 @@ export class ClipboardHistory {
   }
 
   remove(id: string): void {
-    const before = this.list.length;
-    this.list = this.list.filter((e) => e.id !== id);
-    if (this.list.length !== before) this.commit();
+    this.drop((e) => e.id === id);
   }
 
   clear({ includePinned = false } = {}): void {
-    this.list = includePinned ? [] : this.list.filter((e) => e.pinned);
+    this.drop((e) => includePinned || !e.pinned);
+  }
+
+  private drop(predicate: (e: ClipEntry) => boolean): void {
+    const gone = this.list.filter(predicate);
+    if (!gone.length) return;
+    this.list = this.list.filter((e) => !predicate(e));
     this.commit();
+    for (const e of gone) this.opts.onDiscard?.(e);
   }
 
   private toEntry(c: ClipContent, signature: string): ClipEntry | null {
@@ -120,7 +126,7 @@ export class ClipboardHistory {
       case 'text': {
         const trimmed = c.text.trim();
         if (!trimmed) return null;
-        return { ...base, kind: LINK.test(trimmed) ? 'link' : 'text', text: c.text, preview: trimmed.slice(0, 200) };
+        return { ...base, kind: isWebLink(trimmed) ? 'link' : 'text', text: c.text, preview: trimmed.slice(0, 200) };
       }
       case 'files':
         if (!c.files.length) return null;
@@ -133,9 +139,10 @@ export class ClipboardHistory {
   private trim(): boolean {
     let unpinned = 0;
     const kept = this.list.filter((e) => e.pinned || ++unpinned <= this.limit);
-    const changed = kept.length !== this.list.length;
+    const gone = this.list.filter((e) => !kept.includes(e));
     this.list = kept;
-    return changed;
+    for (const e of gone) this.opts.onDiscard?.(e);
+    return gone.length > 0;
   }
 
   private commit(): void {

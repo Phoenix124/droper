@@ -1,4 +1,5 @@
 import type { DroppedSnippet, ItemView } from '../shared/api';
+import { rangeSelection } from './selection.js';
 
 const api = window.droper;
 const panel = document.getElementById('panel')!;
@@ -14,6 +15,7 @@ let renaming: string | null = null;
 
 function render(): void {
   for (const id of [...selected]) if (!items.some((i) => i.id === id)) selected.delete(id);
+  if (anchor && !items.some((i) => i.id === anchor)) anchor = null;
   panel.classList.toggle('is-empty', items.length === 0);
   const files = items.reduce((n, i) => n + i.count, 0);
   count.textContent = items.length ? `${files} ${files === 1 ? 'item' : 'items'}` : '';
@@ -106,11 +108,11 @@ function itemIdFrom(target: EventTarget | null): string | null {
 
 function select(id: string, e: MouseEvent | KeyboardEvent): void {
   const toggle = api.platform === 'darwin' ? e.metaKey : e.ctrlKey;
-  if (e.shiftKey && anchor) {
-    const a = items.findIndex((i) => i.id === anchor);
-    const b = items.findIndex((i) => i.id === id);
+  if (e.shiftKey) {
+    const range = rangeSelection(items.map((i) => i.id), anchor, id);
     selected.clear();
-    for (let i = Math.min(a, b); i <= Math.max(a, b); i++) selected.add(items[i].id);
+    range.forEach((x) => selected.add(x));
+    if (range.length === 1) anchor = id;
   } else if (toggle) {
     if (selected.has(id)) selected.delete(id);
     else selected.add(id);

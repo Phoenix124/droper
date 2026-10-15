@@ -44,7 +44,6 @@ export class DragWatcher {
 
   start(): void {
     if (this.started) return;
-    this.started = true;
     uIOhook.on('mousedown', (e) => {
       if (e.button !== LEFT_BUTTON) return;
       this.dragCountAtDown = this.pasteboard?.dragCount ?? -1;
@@ -57,7 +56,13 @@ export class DragWatcher {
       this.detector.mouseUp(p);
       this.hooks.onMouseUp(p);
     });
-    uIOhook.start();
+    try {
+      uIOhook.start();
+    } catch (err) {
+      uIOhook.removeAllListeners();
+      throw err;
+    }
+    this.started = true;
   }
 
   stop(): void {
