@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  dialog,
   globalShortcut,
   ipcMain,
   Menu,
@@ -13,7 +14,7 @@ import {
   type MenuItemConstructorOptions,
 } from 'electron';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, isAbsolute, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ClipboardHistory, type ClipContent, type ClipEntry } from '../core/clipboardHistory.js';
@@ -26,7 +27,7 @@ import { JsonFile } from '../core/jsonFile.js';
 import { latestOnly } from '../core/latest.js';
 import { SettingsStore, type Settings } from '../core/settings.js';
 import { ShelfStore, type ShelfItem, type ShelfState } from '../core/shelfStore.js';
-import { parseDroperUrl } from '../core/urlScheme.js';
+import { needsConfirmation, parseDroperUrl, type UrlAction } from '../core/urlScheme.js';
 import type { ClipEntryView, ItemView } from '../shared/api';
 import { DragWatcher } from './dragWatcher.js';
 import { MacPasteboardWatcher } from './macPasteboard.js';
@@ -60,7 +61,7 @@ function openPaths(paths: string[]): void {
 }
 
 function openUrls(urls: string[]): void {
-  if (controller) urls.forEach((u) => controller!.handleUrl(u));
+  if (controller) urls.forEach((u) => void controller!.handleUrl(u));
   else pendingUrls.push(...urls);
 }
 
@@ -299,9 +300,23 @@ class Controller {
 
   // ---- URL scheme ---------------------------------------------------------
 
-  handleUrl(raw: string): void {
-    const action = parseDroperUrl(raw);
+  /** Any web page can open droper:// links, so they are untrusted input. */
+  async handleUrl(raw: string): Promise<void> {
+    let action = parseDroperUrl(raw);
     if (!action) return;
+    if (action.type === 'add') {
+      // Resolve symlinks so the confirmation shows what would really end up on the shelf.
+      const paths = action.paths.flatMap((p) => {
+        try {
+          return [realpathSync(p)];
+        } catch {
+          return [];
+        }
+      });
+      if (!paths.length) return;
+      action = { type: 'add', paths };
+    }
+    if (needsConfirmation(action) && this.settings.get().confirmUrlActions && !(await this.confirmUrlAction(action))) return;
     switch (action.type) {
       case 'show':
         if (!this.shelf.visible) this.showShelf();
@@ -331,6 +346,24 @@ class Controller {
         if (!this.shelf.visible) this.showShelf();
         break;
     }
+  }
+
+  private async confirmUrlAction(action: UrlAction): Promise<boolean> {
+    const list = action.type === 'add' ? action.paths : [];
+    const shown = list.slice(0, 10).join('\n') + (list.length > 10 ? `\n… and ${list.length - 10} more` : '');
+    if (isMac) app.focus({ steal: true });
+    const { response, checkboxChecked } = await dialog.showMessageBox({
+      type: 'question',
+      buttons: [action.type === 'add' ? 'Add to Shelf' : 'Clear Shelf', 'Cancel'],
+      defaultId: 1,
+      cancelId: 1,
+      message: action.type === 'add' ? 'A droper:// link wants to add files to your shelf' : 'A droper:// link wants to clear your shelf',
+      detail: action.type === 'add' ? `${shown}\n\nOnly continue if you started this yourself.` : 'Only continue if you started this yourself.',
+      checkboxLabel: "Don't ask again for droper:// links",
+    });
+    if (response !== 0) return false;
+    if (checkboxChecked) this.settings.update({ confirmUrlActions: false });
+    return true;
   }
 
   // ---- shelf content ----------------------------------------------------

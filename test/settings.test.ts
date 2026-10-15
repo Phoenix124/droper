@@ -75,3 +75,11 @@ describe('appearance and ignore list settings', () => {
   });
 });
 
+describe('URL scheme confirmation setting', () => {
+  it('asks before droper:// links add files or clear the shelf by default', () => {
+    expect(DEFAULT_SETTINGS.confirmUrlActions).toBe(true);
+    expect(normalizeSettings({ confirmUrlActions: false }).confirmUrlActions).toBe(false);
+    expect(normalizeSettings({ confirmUrlActions: 'no' }).confirmUrlActions).toBe(true);
+  });
+});
+

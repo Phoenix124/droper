@@ -6,7 +6,10 @@ export type UrlAction =
 
 const SIMPLE = new Set(['show', 'hide', 'toggle', 'clear', 'restore']);
 const MAX_TEXT = 200_000;
-const ABSOLUTE = /^(\/|[a-zA-Z]:[\\/]|\\\\)/;
+// Local absolute paths only: POSIX `/x` or a Windows drive `C:\x`. UNC (`\\host\share`, `//host/share`)
+// and device paths are refused, because merely checking them makes Windows contact a remote
+// SMB server and send the user's NTLM credentials.
+const LOCAL_ABSOLUTE = /^(\/(?![\\/])|[a-zA-Z]:[\\/])/;
 
 /**
  * Parses droper:// links, e.g. droper://add?path=/a&path=/b or droper://add-text?text=hi.
@@ -25,7 +28,7 @@ export function parseDroperUrl(raw: string): UrlAction | null {
 
   if (SIMPLE.has(action)) return { type: action as 'show' };
   if (action === 'add') {
-    const paths = q.getAll('path').filter((p) => ABSOLUTE.test(p));
+    const paths = q.getAll('path').filter((p) => LOCAL_ABSOLUTE.test(p));
     return paths.length ? { type: 'add', paths } : null;
   }
   if (action === 'add-text') {
@@ -39,4 +42,9 @@ export function parseDroperUrl(raw: string): UrlAction | null {
     return { type: 'addUrl', url: target, ...(title ? { title } : {}) };
   }
   return null;
+}
+
+/** Actions a web page could abuse (pull arbitrary local files onto the shelf, wipe it) need the user's OK. */
+export function needsConfirmation(action: UrlAction): boolean {
+  return action.type === 'add' || action.type === 'clear';
 }

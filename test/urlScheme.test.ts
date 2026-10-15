@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseDroperUrl } from '../src/core/urlScheme';
+import { needsConfirmation, parseDroperUrl } from '../src/core/urlScheme';
 
 describe('parseDroperUrl', () => {
   it('parses simple actions', () => {
@@ -36,4 +36,20 @@ describe('parseDroperUrl', () => {
   it('caps oversized text', () => {
     expect(parseDroperUrl(`droper://add-text?text=${'a'.repeat(200_001)}`)).toBeNull();
   });
+
+  it('marks which actions need the user to confirm', () => {
+    expect(needsConfirmation({ type: 'add', paths: ['/a'] })).toBe(true);
+    expect(needsConfirmation({ type: 'clear' })).toBe(true);
+    for (const a of [{ type: 'show' }, { type: 'restore' }, { type: 'addText', text: 'x' }] as const) {
+      expect(needsConfirmation(a)).toBe(false);
+    }
+  });
+
+  it('rejects UNC and device paths so a link cannot make Windows contact a remote SMB server', () => {
+    for (const p of ['\\\\evil\\share\\x.txt', '//evil/share/x.txt', '\\\\?\\C:\\x', '\\\\.\\pipe\\x']) {
+      expect(parseDroperUrl(`droper://add?path=${encodeURIComponent(p)}`)).toBeNull();
+    }
+    expect(parseDroperUrl(`droper://add?path=${encodeURIComponent('//evil/s')}&path=/ok`)).toEqual({ type: 'add', paths: ['/ok'] });
+  });
 });
+

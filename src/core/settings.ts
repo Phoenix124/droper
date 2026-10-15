@@ -19,6 +19,8 @@ export interface Settings {
   shelfWidth: number;
   shelfHeight: number;
   iconSize: IconSize;
+  /** Ask before droper:// links add files or clear the shelf. */
+  confirmUrlActions: boolean;
   /** Drags starting in these apps (bundle id, app name or exe name) don't bring up the shelf. */
   ignoredApps: string[];
 }
@@ -38,6 +40,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   shelfWidth: 132,
   shelfHeight: 460,
   iconSize: 'medium',
+  confirmUrlActions: true,
   ignoredApps: [],
 });
 
@@ -77,7 +80,7 @@ export function normalizeSettings(raw: unknown): Settings {
   const r = raw as Record<string, unknown>;
   if (TRIGGERS.includes(r.trigger as TriggerMode)) s.trigger = r.trigger as TriggerMode;
   if (SIDES.includes(r.side as ShelfSide)) s.side = r.side as ShelfSide;
-  for (const key of ['removeAfterDragOut', 'autoHide', 'launchAtLogin', 'clipboardHistory'] as const) {
+  for (const key of ['removeAfterDragOut', 'autoHide', 'launchAtLogin', 'clipboardHistory', 'confirmUrlActions'] as const) {
     if (typeof r[key] === 'boolean') s[key] = r[key];
   }
   if (typeof r.hotkey === 'string') s.hotkey = r.hotkey;

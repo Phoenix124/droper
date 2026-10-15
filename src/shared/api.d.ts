@@ -39,6 +39,7 @@ export interface SettingsView {
   shelfHeight: number;
   iconSize: 'small' | 'medium' | 'large';
   ignoredApps: string[];
+  confirmUrlActions: boolean;
 }
 
 export interface AppView {
