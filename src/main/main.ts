@@ -202,7 +202,6 @@ class Controller {
     );
 
     this.tray = new Tray(trayIcon());
-    this.tray.setToolTip('Droper');
     this.tray.on('click', () => {
       if (isWin) this.toggleShelf();
     });
@@ -540,6 +539,9 @@ class Controller {
 
   private refreshTrayMenu(): void {
     this.tray.setContextMenu(Menu.buildFromTemplate(this.trayTemplate()));
+    const count = this.store.items().length;
+    if (isMac) this.tray.setTitle(count ? String(count) : '', { fontType: 'monospacedDigit' });
+    this.tray.setToolTip(count ? `Droper — ${count} item${count === 1 ? '' : 's'}` : 'Droper');
   }
 
   private itemMenu(ids: string[], sender: Electron.WebContents): Menu {
