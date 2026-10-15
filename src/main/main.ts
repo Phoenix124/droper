@@ -249,12 +249,12 @@ class Controller {
     // The preview is anchored to the shelf, so it goes away when the shelf hides or is dragged elsewhere.
     this.shelf.win.on('hide', () => this.preview.hide());
     this.shelf.win.on('move', () => this.preview.hide());
-    setInterval(() => {
+    const pruneTimer = setInterval(() => {
       if (this.shelf.visible) this.store.pruneMissing();
     }, 3000);
     // Shelves shown by hand never see a drag end, so an empty one would otherwise stay forever.
     const emptyIdle = new EmptyShelfIdle(3000);
-    setInterval(() => {
+    const idleTimer = setInterval(() => {
       const bounds = this.shelf.bounds();
       const hide = emptyIdle.tick(
         {
@@ -268,6 +268,11 @@ class Controller {
       );
       if (hide) this.shelf.hide();
     }, 500);
+    // Windows are destroyed during quit while timers keep firing; stop them first.
+    app.on('before-quit', () => {
+      clearInterval(pruneTimer);
+      clearInterval(idleTimer);
+    });
     app.on('will-quit', () => {
       globalShortcut.unregisterAll();
       this.watcher.stop();

@@ -56,19 +56,20 @@ export class ShelfWindow {
     });
   }
 
+  /** False once the window is destroyed (during quit), so timers and late callbacks can't throw. */
   get visible(): boolean {
-    return this.win.isVisible();
+    return !this.win.isDestroyed() && this.win.isVisible();
   }
 
   bounds(): Rectangle | null {
-    return this.win.isVisible() ? this.win.getBounds() : null;
+    return this.visible ? this.win.getBounds() : null;
   }
 
   /** Resizes in place, keeping the shelf on screen. */
   setSize(width: number, height: number): void {
     this.width = width;
     this.height = height;
-    if (!this.win.isVisible()) return;
+    if (!this.visible) return;
     const b = this.win.getBounds();
     const area = screen.getDisplayMatching(b).workArea;
     const x = Math.min(Math.max(b.x + b.width - width, area.x), area.x + area.width - width);
@@ -81,6 +82,7 @@ export class ShelfWindow {
    * last put it on this display, or at the screen edge.
    */
   showAt(side: ShelfSide, cursor: Point, underCursor = false): void {
+    if (this.win.isDestroyed()) return;
     const display = screen.getDisplayNearestPoint(cursor);
     const area = display.workArea;
     const size = { width: this.width, height: this.height };
@@ -109,7 +111,7 @@ export class ShelfWindow {
   }
 
   hide(): void {
-    if (this.win.isVisible()) this.win.hide();
+    if (this.visible) this.win.hide();
   }
 
   send(channel: string, ...args: unknown[]): void {
