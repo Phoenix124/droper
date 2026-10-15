@@ -116,12 +116,25 @@ Grab the latest build from [**Releases**](../../releases).
 
 | Platform | File | First launch |
 |---|---|---|
-| 🍎 macOS (Apple Silicon) | `Droper-<version>-arm64.dmg` | Unsigned: right-click → **Open**, then allow **Accessibility** when asked |
+| 🍎 macOS (Apple Silicon) | `Droper-<version>-arm64.dmg` | Unsigned: see [below](#-first-launch-on-macos), then allow **Accessibility** when asked |
 | 🪟 Windows (Intel / AMD) | `Droper-Setup-<version>-x64.exe` | Unsigned: SmartScreen → **More info → Run anyway** |
 | 🪟 Windows (ARM) | `Droper-Setup-<version>-arm64.exe` | Same as above |
 
 > [!NOTE]
 > Accessibility lets Droper see global mouse drags. Without it the shelf still works, but only through the shortcut or menu.
+
+### 🍎 First launch on macOS
+
+Droper isn't signed by Apple yet, so macOS blocks it the first time. Either:
+
+- **System Settings:** open Droper once, then go to **System Settings → Privacy & Security** and click **Open Anyway** next to the Droper message.
+- **Terminal:** after copying Droper to Applications, clear the download quarantine flag:
+
+  ```bash
+  xattr -dr com.apple.quarantine /Applications/Droper.app
+  ```
+
+Only do this for builds downloaded from this repository's Releases, after checking them against `SHA256SUMS.txt`.
 
 ## 🔗 Automation (`droper://`)
 
