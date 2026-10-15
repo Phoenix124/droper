@@ -71,4 +71,27 @@ describe('saveSnippet', () => {
     expect(a).not.toBe(b);
     expect(basename(b)).toBe('same 2.txt');
   });
+
+  it('strips line breaks so .url files cannot get injected keys', () => {
+    const p = saveSnippet(dir, { kind: 'url', url: 'https://a.com/\r\nIconFile=\\\\evil\\x' }, 'win32');
+    const body = readFileSync(p, 'utf8');
+    expect(body.split('\r\n').filter(Boolean)).toHaveLength(2);
+    expect(body).not.toMatch(/^IconFile=/m);
+  });
+
+  it('saves non-web links as plain text instead of shortcuts', () => {
+    const p = saveSnippet(dir, { kind: 'url', url: 'javascript:alert(1)' }, 'win32');
+    expect(basename(p)).toMatch(/\.txt$/);
+    expect(readFileSync(p, 'utf8')).toBe('javascript:alert(1)');
+  });
+
+  it('never takes a non-image extension from the dropped file name', () => {
+    const p = saveSnippet(dir, { kind: 'image', data: new Uint8Array([0]), mime: 'image/png', fileName: 'run.exe' }, 'win32');
+    expect(basename(p)).toBe('run.exe.png');
+  });
+
+  it('rejects non-image mime types for image payloads', () => {
+    const p = saveSnippet(dir, { kind: 'image', data: new Uint8Array([0]), mime: 'application/x-msdownload', fileName: 'a' }, 'win32');
+    expect(basename(p)).toBe('a.png');
+  });
 });
