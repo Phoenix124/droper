@@ -138,6 +138,18 @@ Droper isn't signed by Apple yet, so macOS blocks it the first time. Either:
 
 Only do this for builds downloaded from this repository's Releases, after checking them against `SHA256SUMS.txt`.
 
+### 🗑️ Uninstall
+
+- **macOS:** menu-bar icon → **Uninstall Droper…**. It removes the Accessibility permission, the login item and Droper's data (settings, shelf, clipboard history, kept copies), then moves the app to the Trash. Files you put on the shelf stay where they are.
+
+  If you already dragged Droper to the Trash, the permission entry stays in System Settings. Put the app back in Applications, run the commands below, then delete it:
+
+  ```bash
+  /usr/bin/tccutil reset All com.droper.app
+  rm -rf ~/Library/Application\ Support/Droper
+  ```
+- **Windows:** **Settings → Apps → Droper → Uninstall**. It also removes the *Send to → Droper* shortcut. Settings and shelf data stay in `%APPDATA%\Droper`; delete that folder for a clean slate.
+
 ## 🔗 Automation (`droper://`)
 
 | Link | Does |

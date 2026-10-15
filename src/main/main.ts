@@ -14,7 +14,7 @@ import {
   type IpcMainInvokeEvent,
   type MenuItemConstructorOptions,
 } from 'electron';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { cp } from 'node:fs/promises';
@@ -64,6 +64,8 @@ const pendingUrls: string[] = [];
 let controller: Controller | null = null;
 
 const run = promisify(execFile);
+/** Must match build.appId in package.json; macOS keys privacy permissions by it. */
+const BUNDLE_ID = 'com.droper.app';
 // tar operands go in as "./name" so names starting with "-" or "@" can't pass as options or archive
 // includes; this strips the "./" again inside the archive.
 const TAR_STRIP_DOT = ['-s', ',^\\./,,'];
@@ -533,6 +535,45 @@ class Controller {
     }
   }
 
+  /**
+   * macOS has no uninstall hook: an app dragged to the Trash leaves its privacy permissions,
+   * login item and data behind. This removes all of them, then the app itself.
+   */
+  private async uninstall(): Promise<void> {
+    const bundle = resolve(app.getPath('exe'), '../../..');
+    if (!bundle.endsWith('.app')) return;
+    const { response } = await dialog.showMessageBox({
+      type: 'warning',
+      buttons: ['Uninstall', 'Cancel'],
+      defaultId: 1,
+      cancelId: 1,
+      message: 'Uninstall Droper?',
+      detail:
+        'Droper will remove its Accessibility permission, turn off launch at login, delete its settings, shelf, ' +
+        'clipboard history and kept copies, and move itself to the Trash.\n\nYour own files on the shelf are not touched.',
+    });
+    if (response !== 0) return;
+    app.setLoginItemSettings({ openAtLogin: false });
+    try {
+      // Resets every privacy permission Droper holds (Accessibility, folder access); needs the bundle still registered.
+      await run('/usr/bin/tccutil', ['reset', 'All', BUNDLE_ID]);
+    } catch (err) {
+      console.error('Could not reset privacy permissions', err);
+    }
+    try {
+      await shell.trashItem(bundle);
+    } catch (err) {
+      console.error('Could not move Droper to the Trash', err);
+    }
+    // Electron keeps writing to its data folder until it exits, so delete it from a helper that outlives us.
+    if (!this.dataDir.startsWith(app.getPath('appData') + sep)) return app.quit();
+    spawn('/bin/sh', ['-c', 'while kill -0 "$1" 2>/dev/null; do sleep 0.2; done; rm -rf "$2"', 'droper-uninstall', String(process.pid), this.dataDir], {
+      detached: true,
+      stdio: 'ignore',
+    }).unref();
+    app.quit();
+  }
+
   private setPositions(next: ShelfPositions): void {
     this.positions = next;
     if (this.positionsSave) clearTimeout(this.positionsSave);
@@ -659,7 +700,9 @@ class Controller {
     if (isMac && !systemPreferences.isTrustedAccessibilityClient(false)) {
       items.push({ type: 'separator' }, { label: '⚠︎ Allow Accessibility to detect drags…', click: () => this.requestAccessibility() });
     }
-    items.push({ type: 'separator' }, { label: 'Quit Droper', role: 'quit' });
+    items.push({ type: 'separator' });
+    if (isMac && app.isPackaged) items.push({ label: 'Uninstall Droper…', click: () => void this.uninstall() });
+    items.push({ label: 'Quit Droper', role: 'quit' });
     return items;
   }
 
