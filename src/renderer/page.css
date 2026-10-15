@@ -1,0 +1,16 @@
+html, body { background: var(--bg); }
+body { padding: 20px; }
+h1 { font-size: 18px; margin: 0 0 16px; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-muted); margin: 20px 0 8px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.row label { flex: 1; }
+.hint { display: block; color: var(--fg-muted); font-size: 11px; margin-top: 2px; }
+select, input[type=text], input[type=number], input[type=search] {
+  font: inherit; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px;
+}
+input[type=number] { width: 80px; }
+.btn { border: 1px solid var(--border); background: var(--card); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.warning { display: none; padding: 10px 12px; border-radius: 8px; background: rgba(255, 159, 10, 0.18); margin-bottom: 12px; }
+.warning.show { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

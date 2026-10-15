@@ -15,6 +15,7 @@ import {
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { ClipboardHistory, type ClipContent, type ClipEntry } from '../core/clipboardHistory.js';
 import { contains, type Point } from '../core/dragDetector.js';
 import { saveSnippet, type SnippetPayload } from '../core/ingest.js';
@@ -68,6 +69,13 @@ if (!app.requestSingleInstanceLock()) {
     e.preventDefault();
     openPaths([path]);
   });
+  // No window ever navigates away from its bundled page or opens new windows; a file dropped on a
+  // settings window would otherwise load as a page that still has the preload API.
+  app.on('web-contents-created', (_e, contents) => {
+    contents.on('will-navigate', (ev) => ev.preventDefault());
+    contents.on('will-redirect', (ev) => ev.preventDefault());
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  });
   app.on('window-all-closed', () => {
     // Menu-bar / tray app: keep running without windows.
   });
@@ -96,6 +104,7 @@ class Controller {
   private shownByDrag = false;
   private latestClip: ClipContent | null = null;
   private clipTimer: NodeJS.Timeout | null = null;
+  private captureChain: Promise<void> = Promise.resolve();
   private hookRunning = false;
 
   constructor() {
@@ -336,10 +345,14 @@ class Controller {
     return { kind: 'image', imagePath, signature };
   }
 
-  private async captureClipboard(): Promise<void> {
-    if (!this.settings.get().clipboardHistory) return;
-    this.latestClip = await this.snapshotToContent();
-    this.history.poll();
+  /** Captures run one at a time so a slow read can't land after a newer one. */
+  private captureClipboard(): Promise<void> {
+    this.captureChain = this.captureChain.then(async () => {
+      if (!this.settings.get().clipboardHistory) return;
+      this.latestClip = await this.snapshotToContent();
+      this.history.poll();
+    }).catch((err) => console.error('Clipboard capture failed', err));
+    return this.captureChain;
   }
 
   private async startClipboardHistory(): Promise<void> {
@@ -501,9 +514,18 @@ class Controller {
 
   // ---- IPC ----------------------------------------------------------------
 
+  /** Only the main frame of our own windows, still showing the bundled page it was opened with. */
   private isTrusted(e: IpcMainEvent | IpcMainInvokeEvent): boolean {
-    const wins = [this.shelf.win, this.settingsWin, this.clipWin];
-    return wins.some((w) => w && !w.isDestroyed() && w.webContents === e.sender) && (e.senderFrame?.url.startsWith('file://') ?? false);
+    const frame = e.senderFrame;
+    if (!frame || frame !== e.sender.mainFrame) return false;
+    const pages: [BrowserWindow | null, string][] = [
+      [this.shelf.win, 'shelf.html'],
+      [this.settingsWin, 'settings.html'],
+      [this.clipWin, 'clipboard.html'],
+    ];
+    return pages.some(
+      ([w, page]) => w !== null && !w.isDestroyed() && w.webContents === e.sender && frame.url === pageUrl(page),
+    );
   }
 
   private on(channel: string, handler: (e: IpcMainEvent, ...args: any[]) => void): void {
@@ -558,6 +580,10 @@ class Controller {
     this.handle('settings:accessibility', () => !isMac || systemPreferences.isTrustedAccessibilityClient(false));
     this.on('settings:requestAccessibility', () => this.requestAccessibility());
   }
+}
+
+function pageUrl(page: string): string {
+  return pathToFileURL(join(__dirname, '../renderer', page)).href;
 }
 
 function validSnippet(raw: unknown): SnippetPayload | null {

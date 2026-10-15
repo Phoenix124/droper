@@ -1,0 +1,21 @@
+body { padding: 12px; display: flex; flex-direction: column; height: 100%; }
+.toolbar { display: flex; gap: 8px; }
+.toolbar input { flex: 1; }
+.filters { display: flex; gap: 4px; margin: 10px 0; flex-wrap: wrap; }
+.filters button { border: 0; background: transparent; padding: 3px 9px; border-radius: 12px; cursor: pointer; color: var(--fg-muted); }
+.filters button.on { background: var(--accent); color: #fff; }
+.clips { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+.clip { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: 8px; cursor: pointer; }
+.clip:hover { background: var(--card); }
+.clip img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; flex: none; }
+.clip .kind { width: 40px; flex: none; text-align: center; font-size: 18px; }
+.clip .body { flex: 1; min-width: 0; }
+.clip .text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clip .meta { font-size: 11px; color: var(--fg-muted); }
+.clip .actions { display: none; gap: 2px; }
+.clip:hover .actions, .clip.pinned .actions { display: flex; }
+.clip .actions button { border: 0; background: transparent; cursor: pointer; padding: 2px 5px; border-radius: 4px; color: var(--fg-muted); }
+.clip .actions button:hover { background: var(--border); color: var(--fg); }
+.clip.pinned .pin { color: var(--accent); }
+.empty-note { color: var(--fg-muted); text-align: center; display: none; }
+.empty-note.show { display: block; }

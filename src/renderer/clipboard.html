@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'">
+  <title>Clipboard History</title>
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="page.css">
+  <link rel="stylesheet" href="clipboard.css">
+</head>
+<body>
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="Search" spellcheck="false">
+    <button id="clear" class="btn">Clear</button>
+  </div>
+  <nav id="filters" class="filters">
+    <button data-f="all" class="on">All</button>
+    <button data-f="pinned">Pinned</button>
+    <button data-f="text">Text</button>
+    <button data-f="link">Links</button>
+    <button data-f="image">Images</button>
+    <button data-f="files">Files</button>
+  </nav>
+  <ul id="list" class="clips"></ul>
+  <p id="empty" class="empty-note">Nothing recorded yet.</p>
+  <script type="module" src="clipboard.js"></script>
+</body>
+</html>

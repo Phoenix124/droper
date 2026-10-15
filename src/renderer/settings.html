@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'">
+  <title>Droper Settings</title>
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="page.css">
+</head>
+<body>
+  <h1>Settings</h1>
+  <div id="ax" class="warning">
+    <span>Droper needs Accessibility access to notice when you start dragging.</span>
+    <button id="ax-btn" class="btn">Open Settings</button>
+  </div>
+
+  <h2>Shelf</h2>
+  <div class="row">
+    <label for="trigger">Show shelf<span class="hint">When a drag should bring the shelf up</span></label>
+    <select id="trigger">
+      <option value="dragStart">As soon as a drag starts</option>
+      <option value="edge">When dragging to the screen edge</option>
+      <option value="atMouse">At the mouse pointer</option>
+      <option value="never">Only via shortcut or menu</option>
+    </select>
+  </div>
+  <div class="row">
+    <label for="side">Position</label>
+    <select id="side">
+      <option value="right">Right edge</option>
+      <option value="left">Left edge</option>
+    </select>
+  </div>
+  <div class="row">
+    <label for="removeAfterDragOut">Remove items after dragging them out<span class="hint">Locked items always stay</span></label>
+    <input id="removeAfterDragOut" type="checkbox">
+  </div>
+  <div class="row">
+    <label for="autoHide">Hide shelf when it's empty</label>
+    <input id="autoHide" type="checkbox">
+  </div>
+  <div class="row">
+    <label for="hotkey">Toggle shortcut<span class="hint">Electron accelerator, e.g. CommandOrControl+Shift+Y. Empty disables it.</span></label>
+    <input id="hotkey" type="text" spellcheck="false">
+  </div>
+
+  <h2>Clipboard</h2>
+  <div class="row">
+    <label for="clipboardHistory">Record clipboard history<span class="hint">Turning it off deletes recorded history</span></label>
+    <input id="clipboardHistory" type="checkbox">
+  </div>
+  <div class="row">
+    <label for="clipboardLimit">Entries to keep<span class="hint">Pinned entries don't count</span></label>
+    <input id="clipboardLimit" type="number" min="1" max="1000">
+  </div>
+
+  <h2>General</h2>
+  <div class="row">
+    <label for="launchAtLogin">Launch at login</label>
+    <input id="launchAtLogin" type="checkbox">
+  </div>
+  <script type="module" src="settings.js"></script>
+</body>
+</html>
