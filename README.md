@@ -66,4 +66,4 @@ Telling a real drag apart from selecting text or moving a window:
 - No Handoff/iCloud, macOS Services menu, widgets or Shortcuts actions.
 - The preview is custom (not the system QLPreviewPanel): formats without a thumbnail generator show their icon.
 - Windows: "Copy" puts paths as text (Electron can't write CF_HDROP). Reading several copied files goes through `text/uri-list` (verified on macOS, not yet on Windows).
-- Removal after drag-out is decided by where the mouse is released (outside the shelf = moved). A cancelled drag counts too — that's what "Restore Removed Items" is for.
+- Drag-out uses a small native addon (`native/`: NSDraggingSession on macOS, SHDoDragDrop on Windows) that reports whether the drop target accepted the files, so cancelled or refused drops keep items on the shelf. If the addon isn't built, Droper falls back to judging by where the mouse was released.

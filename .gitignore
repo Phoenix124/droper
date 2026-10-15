@@ -10,3 +10,4 @@ release/
 .idea/
 .DS_Store
 .beads/
+native/build/

@@ -12,7 +12,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
     "dist:mac": "npm run build && electron-builder --mac --publish never",
     "dist:win": "npm run build && electron-builder --win --publish never",
-    "icon": "node scripts/gen-icon.mjs"
+    "icon": "node scripts/gen-icon.mjs",
+    "postinstall": "node scripts/build-native.mjs",
+    "build:native": "node scripts/build-native.mjs"
   },
   "build": {
     "appId": "com.droper.app",
@@ -20,7 +22,8 @@
       "dist/**",
       "package.json",
       "!node_modules/uiohook-napi/build/**",
-      "!node_modules/uiohook-napi/{src,libuiohook}/**"
+      "!node_modules/uiohook-napi/{src,libuiohook}/**",
+      "native/build/Release/droper_native.node"
     ],
     "mac": {
       "category": "public.app-category.productivity",
@@ -48,7 +51,8 @@
       "output": "release"
     },
     "asarUnpack": [
-      "node_modules/uiohook-napi/**"
+      "node_modules/uiohook-napi/**",
+      "native/build/Release/droper_native.node"
     ],
     "nsis": {
       "oneClick": false,
@@ -67,6 +71,7 @@
     "@types/node": "26.6.5",
     "electron": "44.7.2",
     "electron-builder": "26.15.3",
+    "node-gyp": "13.1.0",
     "typescript": "7.0.2",
     "vitest": "5.0.4"
   },

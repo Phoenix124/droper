@@ -18,6 +18,7 @@ import { basename, isAbsolute, join, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ClipboardHistory, type ClipContent, type ClipEntry } from '../core/clipboardHistory.js';
 import { contains, type Point } from '../core/dragDetector.js';
+import { shouldRemoveAfterDragOut } from '../core/dragOut.js';
 import { saveSnippet, type SnippetPayload } from '../core/ingest.js';
 import { isWebLink, renameTarget } from '../core/fileNames.js';
 import { JsonFile } from '../core/jsonFile.js';
@@ -27,6 +28,7 @@ import { ShelfStore, type ShelfItem, type ShelfState } from '../core/shelfStore.
 import type { ClipEntryView, ItemView } from '../shared/api';
 import { DragWatcher } from './dragWatcher.js';
 import { MacPasteboardWatcher } from './macPasteboard.js';
+import { nativeDrag, type NativeDragEnd } from './nativeDrag.js';
 import {
   copyFiles,
   dragIconFor,
@@ -199,7 +201,32 @@ class Controller {
     this.scheduleAutoHide();
   }
 
-  /** Raw mouse-up, also for drags that started on the shelf itself (drag-out). */
+  /** Prefers the native drag, which reports whether the drop target accepted the files. */
+  private startDragOut(ids: string[], paths: string[], sender: Electron.WebContents): void {
+    const native = nativeDrag();
+    if (native) {
+      try {
+        if (native.startDrag(this.shelf.win.getNativeWindowHandle(), paths, (end) => this.onNativeDragEnd(ids, end))) return;
+      } catch (err) {
+        console.error('Native drag failed, falling back', err);
+      }
+    }
+    this.outgoing = ids;
+    sender.startDrag({ file: paths[0], files: paths, icon: dragIconFor(paths) });
+  }
+
+  private onNativeDragEnd(ids: string[], end: NativeDragEnd): void {
+    const p = isWin ? screen.screenToDipPoint({ x: end.x, y: end.y }) : { x: end.x, y: end.y };
+    const bounds = this.shelf.bounds();
+    const remove = shouldRemoveAfterDragOut({
+      operation: end.operation,
+      endedOnShelf: bounds !== null && contains(bounds, p),
+      removeAfterDragOut: this.settings.get().removeAfterDragOut,
+    });
+    if (remove) this.store.remove(ids);
+  }
+
+  /** Fallback when the native addon is missing: decides by where the mouse was released. */
   private onMouseUp(p: Point): void {
     const ids = this.outgoing;
     if (!ids) return;
@@ -604,9 +631,7 @@ class Controller {
     this.on('shelf:startDrag', (e, raw) => {
       const sel = ids(raw);
       const paths = this.store.pathsFor(sel).filter((p) => existsSync(p));
-      if (!paths.length) return;
-      this.outgoing = sel;
-      e.sender.startDrag({ file: paths[0], files: paths, icon: dragIconFor(paths) });
+      if (paths.length) this.startDragOut(sel, paths, e.sender);
     });
     this.on('shelf:contextMenu', (e, raw) => {
       const sel = ids(raw);
