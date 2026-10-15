@@ -10,6 +10,15 @@ const MAX_TEXT = 200_000;
 // and device paths are refused, because merely checking them makes Windows contact a remote
 // SMB server and send the user's NTLM credentials.
 const LOCAL_ABSOLUTE = /^(\/(?![\\/])|[a-zA-Z]:[\\/])/;
+// Control and bidi-override characters could disguise a path (or fake extra text) in the confirmation dialog.
+const DECEPTIVE = /[\u0000-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069]/;
+/** Every path of a link is listed in the confirmation dialog, so keep that list readable. */
+export const MAX_URL_PATHS = 20;
+
+/** False for paths that could be rendered misleadingly (control or bidi characters). */
+export function isDisplaySafePath(path: string): boolean {
+  return !DECEPTIVE.test(path);
+}
 
 /**
  * Parses droper:// links, e.g. droper://add?path=/a&path=/b or droper://add-text?text=hi.
@@ -28,7 +37,10 @@ export function parseDroperUrl(raw: string): UrlAction | null {
 
   if (SIMPLE.has(action)) return { type: action as 'show' };
   if (action === 'add') {
-    const paths = q.getAll('path').filter((p) => LOCAL_ABSOLUTE.test(p));
+    const raw = q.getAll('path');
+    // Refuse the whole link rather than silently dropping suspicious entries.
+    if (raw.length > MAX_URL_PATHS || !raw.every(isDisplaySafePath)) return null;
+    const paths = raw.filter((p) => LOCAL_ABSOLUTE.test(p));
     return paths.length ? { type: 'add', paths } : null;
   }
   if (action === 'add-text') {

@@ -27,7 +27,7 @@ import { JsonFile } from '../core/jsonFile.js';
 import { latestOnly } from '../core/latest.js';
 import { SettingsStore, type Settings } from '../core/settings.js';
 import { ShelfStore, type ShelfItem, type ShelfState } from '../core/shelfStore.js';
-import { needsConfirmation, parseDroperUrl, type UrlAction } from '../core/urlScheme.js';
+import { isDisplaySafePath, needsConfirmation, parseDroperUrl, type UrlAction } from '../core/urlScheme.js';
 import type { ClipEntryView, ItemView } from '../shared/api';
 import { DragWatcher } from './dragWatcher.js';
 import { MacPasteboardWatcher } from './macPasteboard.js';
@@ -313,7 +313,8 @@ class Controller {
           return [];
         }
       });
-      if (!paths.length) return;
+      // A harmless-looking symlink may resolve to a deceptive target; refuse the link then.
+      if (!paths.length || !paths.every(isDisplaySafePath)) return;
       action = { type: 'add', paths };
     }
     if (needsConfirmation(action) && this.settings.get().confirmUrlActions && !(await this.confirmUrlAction(action))) return;
@@ -349,8 +350,8 @@ class Controller {
   }
 
   private async confirmUrlAction(action: UrlAction): Promise<boolean> {
-    const list = action.type === 'add' ? action.paths : [];
-    const shown = list.slice(0, 10).join('\n') + (list.length > 10 ? `\n… and ${list.length - 10} more` : '');
+    // The parser caps links at MAX_URL_PATHS and rejects control/bidi characters, so every path is shown verbatim.
+    const shown = action.type === 'add' ? action.paths.join('\n') : '';
     if (isMac) app.focus({ steal: true });
     const { response, checkboxChecked } = await dialog.showMessageBox({
       type: 'question',

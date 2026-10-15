@@ -51,5 +51,18 @@ describe('parseDroperUrl', () => {
     }
     expect(parseDroperUrl(`droper://add?path=${encodeURIComponent('//evil/s')}&path=/ok`)).toEqual({ type: 'add', paths: ['/ok'] });
   });
+
+  it('refuses paths with control or bidi characters that could disguise them in the confirmation dialog', () => {
+    for (const p of ['/tmp/a\nOnly continue', '/tmp/\u202Etxt.exe', '/tmp/a\u2066b', '/tmp/a\u0007']) {
+      expect(parseDroperUrl(`droper://add?path=${encodeURIComponent(p)}`)).toBeNull();
+    }
+  });
+
+  it('refuses links with more paths than the dialog can show', () => {
+    const many = Array.from({ length: 21 }, (_, i) => `path=/tmp/f${i}`).join('&');
+    expect(parseDroperUrl(`droper://add?${many}`)).toBeNull();
+    const ok = Array.from({ length: 20 }, (_, i) => `path=/tmp/f${i}`).join('&');
+    expect(parseDroperUrl(`droper://add?${ok}`)).toMatchObject({ type: 'add' });
+  });
 });
 
