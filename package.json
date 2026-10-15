@@ -57,15 +57,10 @@
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
-    "npmRebuild": false,
-    "publish": [
-      {
-        "provider": "github",
-        "releaseType": "draft"
-      }
-    ]
+    "npmRebuild": false
   },
   "devDependencies": {
     "@types/node": "26.6.5",
