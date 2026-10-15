@@ -75,5 +75,18 @@ describe('parseDroperUrl', () => {
     expect(parseDroperUrl('droper://add-url?url=https%3A%2F%2Fevil.example&title=Invoice.pdf')).toEqual({ type: 'addUrl', url: 'https://evil.example' });
     expect(parseDroperUrl('droper://add-url?url=https%3A%2F%2Fa.com&title=Docs')).toEqual({ type: 'addUrl', url: 'https://a.com', title: 'Docs' });
   });
+
+  it('refuses dot segments, so normalization cannot turn an allowed path into a blocked one', () => {
+    for (const p of ['/tmp/../net/evil', '/private/./../Network/x', 'C:\\a\\..\\b.txt', '/tmp/a/..', 'C:/x/./y']) {
+      expect(parseDroperUrl(`droper://add?path=${encodeURIComponent(p)}`)).toBeNull();
+    }
+    expect(parseDroperUrl('droper://add?path=/tmp/a..b.txt')).toEqual({ type: 'add', paths: ['/tmp/a..b.txt'] });
+  });
+
+  it('applies the automount check case-insensitively and with repeated slashes', () => {
+    for (const p of ['/NeT/evil', '/net//evil', '/NETWORK']) {
+      expect(parseDroperUrl(`droper://add?path=${encodeURIComponent(p)}`)).toBeNull();
+    }
+  });
 });
 
