@@ -119,3 +119,58 @@ describe('DragDetector', () => {
   });
 });
 
+
+describe('DragDetector shake mode', () => {
+  function shakeSetup(over: Partial<DragDetectorOptions> = {}) {
+    let t = 0;
+    const s = setup({ mode: 'shake', now: () => t, ...over });
+    return { ...s, at: (ms: number) => (t = ms) };
+  }
+
+  it('shows after the pointer reverses direction three times quickly', () => {
+    const { d, shows, at } = shakeSetup();
+    d.mouseDown({ x: 300, y: 300 });
+    const xs = [340, 380, 340, 300, 340, 380, 340];
+    xs.forEach((x, i) => {
+      at(i * 60);
+      d.mouseMove({ x, y: 300 });
+    });
+    expect(shows).toEqual([{ x: 340, y: 300 }]);
+  });
+
+  it('does not show for a plain drag in one direction', () => {
+    const { d, shows, at } = shakeSetup();
+    d.mouseDown({ x: 100, y: 300 });
+    for (let i = 1; i <= 20; i++) {
+      at(i * 30);
+      d.mouseMove({ x: 100 + i * 30, y: 300 });
+    }
+    expect(shows).toEqual([]);
+  });
+
+  it('ignores slow back-and-forth and tiny jitter', () => {
+    const { d, shows, at } = shakeSetup();
+    d.mouseDown({ x: 300, y: 300 });
+    // Slow: one reversal per second.
+    [380, 300, 380, 300].forEach((x, i) => {
+      at(i * 1000);
+      d.mouseMove({ x, y: 300 });
+    });
+    // Jitter: reversals under the minimum travel.
+    [305, 300, 305, 300, 305, 300].forEach((x, i) => {
+      at(5000 + i * 20);
+      d.mouseMove({ x, y: 300 });
+    });
+    expect(shows).toEqual([]);
+  });
+
+  it('still needs a real drag', () => {
+    const { d, shows, at } = shakeSetup({ isRealDrag: () => false });
+    d.mouseDown({ x: 300, y: 300 });
+    [340, 380, 340, 300, 340, 380, 340].forEach((x, i) => {
+      at(i * 60);
+      d.mouseMove({ x, y: 300 });
+    });
+    expect(shows).toEqual([]);
+  });
+});

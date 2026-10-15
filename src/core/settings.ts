@@ -74,7 +74,7 @@ function cleanIgnored(v: unknown): string[] | null {
   return out;
 }
 
-const TRIGGERS: readonly TriggerMode[] = ['dragStart', 'edge', 'atMouse', 'never'];
+const TRIGGERS: readonly TriggerMode[] = ['dragStart', 'edge', 'atMouse', 'shake', 'never'];
 const SIDES: readonly ShelfSide[] = ['left', 'right'];
 
 export function normalizeSettings(raw: unknown): Settings {

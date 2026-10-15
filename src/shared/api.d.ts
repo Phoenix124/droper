@@ -27,7 +27,7 @@ export interface ClipEntryView {
 }
 
 export interface SettingsView {
-  trigger: 'dragStart' | 'edge' | 'atMouse' | 'never';
+  trigger: 'dragStart' | 'edge' | 'atMouse' | 'shake' | 'never';
   side: 'left' | 'right';
   removeAfterDragOut: boolean;
   autoHide: boolean;
