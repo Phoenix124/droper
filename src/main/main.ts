@@ -14,9 +14,10 @@ import {
   type IpcMainInvokeEvent,
   type MenuItemConstructorOptions,
 } from 'electron';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, isAbsolute, join, resolve, sep } from 'node:path';
+import { cp } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ClipboardHistory, type ClipContent, type ClipEntry } from '../core/clipboardHistory.js';
 import { contains, type Point } from '../core/dragDetector.js';
@@ -145,6 +146,8 @@ if (!app.requestSingleInstanceLock()) {
 class Controller {
   private readonly dataDir = app.getPath('userData');
   private readonly snippetsDir = join(this.dataDir, 'Snippets');
+  /** Kept copies, one folder per copied file: Copies/<uuid>/<name>. */
+  private readonly copiesDir = join(this.dataDir, 'Copies');
   private readonly clipImagesDir = join(this.dataDir, 'ClipImages');
   private readonly settings = new SettingsStore(new JsonFile<Settings>(join(this.dataDir, 'settings.json')));
   private readonly store: ShelfStore;
@@ -176,7 +179,7 @@ class Controller {
     this.store = new ShelfStore({
       persistence: { load: () => shelfFile.read(), save: (s) => shelfFile.write(s) },
       exists: existsSync,
-      onDiscard: (item) => this.discardSnippetFiles(item),
+      onDiscard: (item) => this.discardOwnedFiles(item),
     });
     const clipFile = new JsonFile<{ entries: ClipEntry[] }>(join(this.dataDir, 'clipboard.json'));
     this.history = new ClipboardHistory({
@@ -440,11 +443,34 @@ class Controller {
     this.store.addPaths(paths, { snippet: true });
   }
 
-  /** Files inside Snippets/ belong to Droper whatever item (or stack) they ended up in. */
-  private discardSnippetFiles(item: ShelfItem): void {
+  /** Files inside Snippets/ and Copies/ belong to Droper whatever item (or stack) they ended up in. */
+  private discardOwnedFiles(item: ShelfItem): void {
     const inUse = new Set(this.store.items().flatMap((i) => i.paths));
     for (const p of item.paths) {
-      if (p.startsWith(this.snippetsDir + sep) && !inUse.has(p)) rmSync(p, { force: true, recursive: true });
+      if (inUse.has(p)) continue;
+      if (p.startsWith(this.snippetsDir + sep)) rmSync(p, { force: true, recursive: true });
+      else if (p.startsWith(this.copiesDir + sep)) rmSync(dirname(p), { force: true, recursive: true });
+    }
+  }
+
+  private isOwned(path: string): boolean {
+    return path.startsWith(this.snippetsDir + sep) || path.startsWith(this.copiesDir + sep);
+  }
+
+  /** Copies referenced files into Droper's storage so the items survive the originals moving or going away. */
+  private async keepCopies(ids: string[]): Promise<void> {
+    for (const item of this.store.items().filter((i) => ids.includes(i.id))) {
+      for (const from of item.paths) {
+        if (this.isOwned(from) || !existsSync(from)) continue;
+        const to = join(this.copiesDir, randomUUID(), basename(from));
+        try {
+          await cp(from, to, { recursive: true, preserveTimestamps: true, errorOnExist: true, force: false });
+          this.store.replacePath(item.id, from, to);
+        } catch (err) {
+          rmSync(dirname(to), { force: true, recursive: true });
+          console.error('Could not keep a copy of', from, err);
+        }
+      }
     }
   }
 
@@ -563,6 +589,7 @@ class Controller {
     const paths = selected.flatMap((i) => i.paths);
     const single = selected.length === 1 ? selected[0] : null;
     const anyUnlocked = selected.some((i) => !i.locked);
+    const anyReference = paths.some((p) => !this.isOwned(p));
     const template: MenuItemConstructorOptions[] = [
       { label: 'Open', click: () => paths.forEach((p) => void shell.openPath(p)) },
       { label: 'Quick Look', click: () => this.toggleQuickLook(ids) },
@@ -578,6 +605,7 @@ class Controller {
       { label: anyUnlocked ? 'Lock' : 'Unlock', click: () => this.store.setLocked(ids, anyUnlocked) },
       { label: 'Merge into Stack', enabled: selected.length > 1, click: () => this.store.mergeToStack(ids) },
       { label: 'Split Stack', visible: single?.kind === 'stack', click: () => this.store.splitStack(single!.id) },
+      { label: 'Keep a Copy', enabled: anyReference, click: () => void this.keepCopies(ids) },
       { type: 'separator' },
       { label: 'Remove from Shelf', enabled: anyUnlocked, click: () => this.store.remove(ids) },
       { label: isMac ? 'Move to Trash' : 'Move to Recycle Bin', enabled: anyUnlocked, click: () => void this.trashItems(ids) },
